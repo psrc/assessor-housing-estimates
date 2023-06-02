@@ -15,14 +15,14 @@ library(stringr)
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
 #Current Year Processing
 
-# Run this script from the directory of this file, unless data_dir is set as an absolute path
-setwd("J:\Projects\Assessor\assessor_permit\scripts")
+# Set working directory
+setwd("J:/Projects/Assessor/assessor_permit/scripts/assessor-housing-estimates")
 
 # Data directories
-current_data_dir <- "../data/data_research_phase/extracts/current"
-base_data_dir <- "../data/data_research_phase/extracts/base_year_2009"
-inputs_data_dir <- "../data/data_research_phase/script_inputs"
-outputs_data_dir <- "../data/data_research_phase/script_outputs"
+current_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/data_research_phase/extracts/current"
+base_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/data_research_phase/extracts/base_year_2009"
+inputs_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/data_research_phase/script_inputs"
+outputs_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/data_research_phase/script_outputs"
 
 pin_translation_file_name <- "PIN_Translation_2021_2009.csv"
 city_tract_file_name <- "city_tract.csv"
