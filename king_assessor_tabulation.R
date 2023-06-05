@@ -93,7 +93,7 @@ names(comm_bldg_section_09) <- tolower(names(comm_bldg_section_09))
 names(look_up_09) <- tolower(names(look_up_09))
 names(parcels_09) <- tolower(names(parcels_09))
 
-# Set current major/minor fields to same number of digits by adding 0's
+# Add 0's to major/minor fields so new PIN field will be 10 digits to match parcel shapefile
 apts$major <- str_pad(apts$major, 6, pad = 0)
 apts$minor <- str_pad(apts$minor, 4, pad = 0)
 resbldgs$major <- str_pad(resbldgs$major, 6, pad = 0)
@@ -111,15 +111,6 @@ parcels$minor <- str_pad(parcels$minor, 4, pad = 0)
 unit_breakdown$major <- str_pad(unit_breakdown$major, 6, pad = 0)
 unit_breakdown$minor <- str_pad(unit_breakdown$minor, 4, pad = 0)
 
-# Deletes existing pins fields because some of the pins are not 10 digits and can't be joined to the parcel pins
-apts_09 <- select(apts_09,-pin)
-resbldgs_09 <- select(resbldgs_09,-pin)
-condo_complex_09 <- select(condo_complex_09,-pin)
-condo_units_09 <- select(condo_units_09,-pin)
-comm_bldg_section_09 <- select(comm_bldg_section_09,-pin)
-parcels_09 <- select(parcels_09,-pin)
-
-# Set base major/minor fields to same number of digits by adding 0's
 apts_09$major <- str_pad(apts_09$major, 6, pad = 0)
 apts_09$minor <- str_pad(apts_09$minor, 4, pad = 0)
 resbldgs_09$major <- str_pad(resbldgs_09$major, 6, pad = 0)
@@ -132,6 +123,14 @@ comm_bldg_section_09$major <- str_pad(comm_bldg_section_09$major, 6, pad = 0)
 comm_bldg_section_09$minor <- str_pad(comm_bldg_section_09$minor, 4, pad = 0)
 parcels_09$major <- str_pad(parcels_09$major, 6, pad = 0)
 parcels_09$minor <- str_pad(parcels_09$minor, 4, pad = 0)
+
+# Deletes existing pins fields because some of the pins are not 10 digits and can't be joined to the parcel shapefile pins
+apts_09 <- select(apts_09,-pin)
+resbldgs_09 <- select(resbldgs_09,-pin)
+condo_complex_09 <- select(condo_complex_09,-pin)
+condo_units_09 <- select(condo_units_09,-pin)
+comm_bldg_section_09 <- select(comm_bldg_section_09,-pin)
+parcels_09 <- select(parcels_09,-pin)
 
 # Concatenate major/minors fields into new 'pin' field
 parcels$pin <- paste(parcels$major, parcels$minor, sep="")
@@ -177,19 +176,18 @@ condo_complex <- filter(condo_complex,!complextype %in% c(3,8)) %>%
 
 ## Looks at the "Use" field in the commercial building section table to classify apartment complexes as 'residential','group quarters', or 'other'
 
-# filter commercial building data frame for two columns
+# Filter commercial building data frame for two columns
 sec_use <- comm_bldg_section %>% 
   select(pin, sectionuse)
 
-# create joined data frame
+# Join section use info to apts data frame
 sec_use_apts <- left_join(apts, sec_use, by = 'pin')
 
-# section uses by group
+# Define section uses by group
 res <- c(300,984,352,348,596,587,351)
 gq <- c(982,321,324,424,451,710,589,551,985,782,784,783)
 
-# create new intermediate column 'unit_category' and apply criteria with case_when().
-# result is one-to-many table
+# Create 'unit_category' column and assign numeric values to residential and qroup quarter types
 df_code <- sec_use_apts %>% 
   select(pin, complexdescr, sectionuse) %>% 
   mutate(unit_category = case_when(sectionuse %in% res ~ 'Residential',
@@ -198,18 +196,19 @@ df_code <- sec_use_apts %>%
   mutate(unit_bin = case_when(unit_category == 'Residential' ~ 100,
                               unit_category == 'Group Quarters' ~ 1))
 
-# group by pin and Complex Name. Sum of numbers will determine label
+# Group by pin and complex name and sum 'unit_bin' category
 df_cat <- df_code %>% 
   drop_na(unit_bin) %>% 
   group_by(pin, complexdescr) %>% 
   summarise(sum_unit_bin = sum(unit_bin))
 
-# final one-to-one table, apply labels
+# Use summarised 'unit_bin' values to determine final apt complex classifications
 apts <- apts %>% 
   left_join(df_cat, by = c('pin', 'complexdescr')) %>% 
   mutate(complex_category = case_when(sum_unit_bin >= 100 ~ 'Residential',
                                       sum_unit_bin < 100 ~ 'Group Quarters',
                                       is.na(sum_unit_bin) ~ 'Other'))
+
 
 # Present Use codes found in look up table
 present_use <- filter(look_up,lutype==102)
