@@ -37,4 +37,5 @@ for(b in bldg_files) {
   bldg_dfs[[names(which(bldg_files == b))]] <- df 
 }
 
+# use consistent symbols, <- instead of = when assigning
 # 2010:2019 instead of c(2010, 2011, ..., 2019)
