@@ -16,60 +16,68 @@ geo_conn <- dbConnect(odbc::odbc(),
 )
 
 # source data file paths
-current_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/research_phase/extracts/current_year/"
-current_appraisal_file_name <- "appraisal_account_2020.csv"
-current_improvement_file_name <- "improvement_2020.csv"
-current_builtas_file_name <- "improvement_builtas_2020.csv"
+current_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2023/extracts/current/"
+current_appraisal_file_name <- "appraisal_account.txt"
+current_improvement_file_name <- "improvement.txt"
+current_builtas_file_name <- "improvement_builtas.txt"
 
-base_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/research_phase/extracts/base_year/"
+base_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/base_year/extracts/"
 base_appraisal_file_name <- "appraisal_account_2012.csv"
 base_improvement_file_name <- "improvement_2012.csv"
 base_builtas_file_name <- "improvement_builtas_2012.csv"
 
-shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/research_phase/GIS/"
+current_shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2023/GIS/"
+current_base_shapefile_name <- "parcels_2023_2012_region22_tract20.shp"
 
-output_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/research_phase/script_outputs/"
+base_shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/base_year/GIS/"
+condo_base_shapefile_name <- "pierce_condos_2012.shp"
+
+juris_query <- "SELECT juris, feat_type FROM ElmerGeo.dbo.PSRC_REGION WHERE cnty_name = 'Pierce' AND feat_type <> 'water'"
+
+tract_query <- "SELECT geoid20 FROM ElmerGeo.dbo.TRACT2020 WHERE county_name = 'Pierce'"
+
+output_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2023/script_outputs/"
 
 year_start <- 2012
-year_end <- 2019
+year_end <- 2022
 
 
 # Load data from source -----------------------------------------------------------------------
 
-juris <- dbGetQuery(geo_conn,
-                    "SELECT juris, feat_type FROM ElmerGeo.dbo.PSRC_REGION
-                     WHERE cnty_name = 'Pierce' AND feat_type <> 'water'") %>% 
+juris <- dbGetQuery(geo_conn, juris_query) %>% 
   mutate(juris = ifelse(feat_type %in% c("uninc", "rural"), "Unincorporated Pierce", juris)) %>% 
   select(-feat_type) %>% 
   distinct() %>% 
   arrange()
 
-tracts <- dbGetQuery(geo_conn,
-                     "SELECT geoid10 FROM ElmerGeo.dbo.TRACT2010 WHERE county_name = 'Pierce'")
+tracts <- dbGetQuery(geo_conn, tract_query)
 
 dbDisconnect(geo_conn)
 rm(geo_conn)
 
-current_improvement <- read_csv(paste0(current_file_path, current_improvement_file_name),
-                                col_types = cols(
-                                  parcel_number = col_character()
-                                )) %>% 
+current_improvement <- read_delim(paste0(current_file_path, current_improvement_file_name),
+                                  delim = "|",
+                                  col_types = cols(
+                                    parcel_number = col_character()
+                                  )) %>% 
   filter(!(property_type %in% c("Industrial", "Out Building")))
 
-current_builtas <- read_csv(paste0(current_file_path, current_builtas_file_name),
-                            col_types = cols(
-                              parcel_number = col_character()
-                            )) %>% 
-  filter(year_built >= 2012 & year_built <= 2019
+current_builtas <- read_delim(paste0(current_file_path, current_builtas_file_name),
+                              delim = "|",
+                              col_types = cols(
+                                parcel_number = col_character()
+                              )) %>% 
+  filter(year_built >= year_start & year_built <= year_end
          & built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13,
                               14, 15, 16, 17, 18, 21, 25, 51, 55, 57,
                               58, 61, 65, 67, 68, 71, 75, 77, 78,
                               300, 352, 1300, 1459))
 
-current_appraisal <- read_csv(paste0(current_file_path, current_appraisal_file_name),
-                              col_types = cols(
-                                parcel_number = col_character()
-                              )) %>% 
+current_appraisal <- read_delim(paste0(current_file_path, current_appraisal_file_name),
+                                delim = "|",
+                                col_types = cols(
+                                  parcel_number = col_character()
+                                )) %>% 
   filter(!is.na(latitude))
 
 base_improvement <- read_csv(paste0(base_file_path, base_improvement_file_name),
@@ -82,7 +90,7 @@ base_builtas <- read_csv(paste0(base_file_path, base_builtas_file_name),
                          col_types = cols(
                            parcel_number = col_character()
                          )) %>% 
-  filter(year_built < 2012
+  filter(year_built < year_start
          & built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13,
                               14, 15, 16, 17, 18, 21, 25, 51, 55, 57,
                               58, 61, 65, 67, 68, 71, 75, 77, 78,
@@ -95,13 +103,13 @@ base_appraisal <- read_csv(paste0(base_file_path, base_appraisal_file_name),
 
 # Read in current year base parcel shapefile with 2012 PINs
 # This is created in ArcMap prior to R processing, using psrc_region layer
-parcels_2020_2012 <- st_read(paste0(shapefile_path, "pierce_parcels_2020_2012_region19_tract10.shp"),
+parcels_current_base <- st_read(paste0(current_shapefile_path, current_base_shapefile_name),
                              crs = 2285, stringsAsFactors = FALSE) %>% 
-  rename(current_prcl = TaxParcelN)
+  rename(current_prcl = taxparceln)
 
 # Read in base year condo parcel shapefile with base parcel PINs
 # This is created in ArcMap prior to R processing
-condo_parcels_2012 <- st_read(paste0(shapefile_path, "pierce_condos_2012.shp"),
+condo_parcels_base <- st_read(paste0(base_shapefile_path, condo_base_shapefile_name),
                               crs = 2285, stringsAsFactors = FALSE)
 
 
@@ -118,36 +126,43 @@ current_year_condos <- left_join(current_builtas, current_improvement,
   filter(appraisal_account_type == "Condominium" & units == 1)
 
 # Fix 0 unit counts based on built_as_id
-current_year$units <- if_else(current_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 21, 25, 68)
+# SFD, townhomes, and MH
+current_year$units <- if_else(current_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 21, 25, 61, 65, 67, 68)
                               & current_year$units == 0, 1, current_year$units)
 
-current_year$units[current_year$built_as_id == 58 & current_year$units %in% c(0, 1)] <- 2
+# Duplexes
+current_year$units[current_year$built_as_id %in% c(51, 55, 57, 58) & current_year$units %in% c(0, 1)] <- 2
 
-current_year$units[current_year$built_as_id == 78 & current_year$units == 0] <- 3
+# Triplexes
+current_year$units[current_year$built_as_id %in% c(71, 75, 77, 78) & current_year$units == 0] <- 3
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 # Delete rows from current table with non-unit buildings (i.e. apartment offices)
 current_year <- current_year[!(current_year$parcel_number == "220132086" & current_year$building_id == 8), ]
 current_year$buildings[current_year$parcel_number == "220132086"] <- 7
 
+current_year <- current_year[!(current_year$parcel_number == "219123117" & current_year$building_id == 4), ]
+current_year$buildings[current_year$parcel_number == "219123117"] <- 3
+
 current_year <- current_year[!(current_year$parcel_number == "220142041" & current_year$units == 0), ]
 current_year <- current_year[!(current_year$parcel_number == "8950003316" & current_year$units == 0), ]
+current_year <- current_year[!(current_year$parcel_number == "9010740030" & current_year$units == 0), ]
 
 current_year <- current_year[!(current_year$parcel_number == "2078140051"), ]
 
-# Delete rows from current table with 0 units (new construction)
+# Delete rows from current table with 0 units (oddball)
 current_year <- current_year[!(current_year$parcel_number == "420346013"), ]
 current_year <- current_year[!(current_year$parcel_number == "420346014"), ]
-current_year <- current_year[!(current_year$parcel_number == "219123117"), ]
-####
+current_year <- current_year[!(current_year$parcel_number == "7850000720"), ]
 
 # Fix null unit counts
 current_year$units[is.na(current_year$units)] <- 1
+####
 
 # Assign structure type based on built_as_id
 current_year$str_type <- case_when(current_year$built_as_id %in% c(14, 15, 16, 21) ~ "MH",
                                    current_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 25) ~ "SFD",
-                                   current_year$built_as_id %in% c(61, 65, 68) ~ "SFA")
+                                   current_year$built_as_id %in% c(61, 65, 67, 68) ~ "SFA")
 
 # Create sf tables of current tables
 current_year_sf <- st_as_sf(current_year,
@@ -161,9 +176,9 @@ current_year_condos_sf <- st_as_sf(current_year_condos,
 current_year_condos_sf <- st_transform(current_year_condos_sf, 2285)
 
 # Join current tables to parcel shapefile via spatial join
-current_year_sf <- st_join(current_year_sf, left = TRUE, parcels_2020_2012)
+current_year_sf <- st_join(current_year_sf, left = TRUE, parcels_current_base)
 
-current_year_condos_sf <- st_join(current_year_condos_sf, left = TRUE, parcels_2020_2012)
+current_year_condos_sf <- st_join(current_year_condos_sf, left = TRUE, parcels_current_base)
 
 # Pull data tables from sf
 current_prcl_join <- st_drop_geometry(current_year_sf)
@@ -190,7 +205,7 @@ current_year_sum <- current_prcl_join %>%
             base_prcl = first(base_prcl),
             juris = first(juris),
             tractid = first(tractid),
-            tract10 = first(tract10)
+            tract20 = first(tract20)
   ) %>% 
   distinct(current_prcl, .keep_all = TRUE)
 
@@ -214,7 +229,7 @@ current_year_condos_sum <- current_condos_prcl_join %>%
             base_prcl = first(base_prcl),
             juris = first(juris),
             tractid = first(tractid),
-            tract10 = first(tract10)
+            tract20 = first(tract20)
   )
 
 # Combine summarized tables
@@ -253,7 +268,7 @@ current_year_join$str_type <- ordered(current_year_join$str_type,
 
 rm(current_appraisal, current_builtas, current_improvement, current_year, current_year_condos,
    current_year_sf, current_year_condos_sf, current_prcl_join, current_condos_prcl_join,
-   current_year_sum, current_year_condos_sum, parcels_2020_2012)
+   current_year_sum, current_year_condos_sum, parcels_current_base)
 
 
 # Aggregate & transform base year data --------------------------------------------------------
@@ -267,15 +282,15 @@ base_year <- left_join(base_builtas, base_improvement,
 
 base_year_condos <- left_join(base_builtas, base_improvement,
                               by = join_by(parcel_number, building_id)) %>% 
-  left_join(., base_appraisal_condos, by = join_by(parcel_number)) %>% 
+  left_join(., base_appraisal, by = join_by(parcel_number)) %>% 
   filter(appraisal_account_type %in% c("Com Condo", "Res Com Condo")
          & units %in% c(0, 1))
 
 # Fix 0 unit counts based on built_as_id
-base_year$units <- if_else(base_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 21, 25, 61, 68)
+base_year$units <- if_else(base_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 21, 25, 61, 65, 67, 68)
                                 & base_year$units == 0, 1, base_year$units)
 
-#### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
+#### UNIQUE TO THIS DATA - CHECK WHEN BASE YEAR CHANGES!
 # Delete rows from base table with non-unit buildings (i.e. apartment offices)
 base_year <- base_year[!(base_year$parcel_number == "220224060" & base_year$building_id == 13), ]
 base_year$buildings[base_year$parcel_number == "220224060"] <- 11
@@ -299,7 +314,7 @@ base_year$base_str_type <- case_when(base_year$built_as_id %in% c(14, 15, 16, 21
                                      base_year$built_as_id %in% c(61, 65, 68) ~ "SFA")
 
 # Pull data table from sf
-condo_parcels_2012 <- st_drop_geometry(condo_parcels_2012) %>% 
+condo_parcels_base <- st_drop_geometry(condo_parcels_base) %>% 
   distinct(., condo_prcl, .keep_all = TRUE)
 
 # Summarize base year table by PIN
@@ -320,7 +335,7 @@ base_year_sum <- base_year %>%
   distinct(parcel_number, .keep_all = TRUE)
 
 # Join base condo records to base condo parcels on condo PIN
-base_condos_join <- left_join(base_year_condos, condo_parcels_2012, by = c("parcel_number" = "condo_prcl"))
+base_condos_join <- left_join(base_year_condos, condo_parcels_base, by = c("parcel_number" = "condo_prcl"))
 
 # Summarize base year condos table by PIN
 # This step constructs condo buildings from individual records
@@ -374,7 +389,7 @@ base_year_join$base_str_type <- ordered(base_year_join$base_str_type,
                                                    "MH"))
 
 rm(base_appraisal, base_builtas, base_improvement, base_year, base_year_condos,
-   base_year_sum, base_condos_join, base_year_condos_sum, condo_parcels_2012)
+   base_year_sum, base_condos_join, base_year_condos_sum, condo_parcels_base)
 
 
 # Combine current & base year data and add new fields -----------------------------------------
@@ -389,10 +404,13 @@ current_base_join <- left_join(current_year_join, base_year_join,
 current_base_join <- current_base_join[!is.na(current_base_join$current_prcl), ]
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
-current_base_join$str_type[current_base_join$current_prcl %in% c("0022272011", "0416104046", "0417084029", "0417173702")] <- "SFD"
-current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026")] <- "SFA"
+current_base_join$str_type[current_base_join$current_prcl %in% c("0022272011", "0416104046", "0417084029",
+                                                                 "0417173702", "0022251008", "5017101160")] <- "SFD"
+current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034", "0221068038")] <- "SFA"
 current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "MH"
+
 current_base_join$base_str_type[current_base_join$current_prcl == "4005000254"] <- "SFD"
+current_base_join$base_str_type[current_base_join$current_prcl == "2485400430"] <- "MH"
 ####
 
 # Specify development type and demolition
@@ -494,7 +512,7 @@ juris_units <- full_join(new_units_juris, demo_units_juris, by = join_by("juris"
 # Tract
 format_tracts <- function(x) {
   x %>%
-    full_join(tracts, by = c("tractid" = "geoid10")) %>%
+    full_join(tracts, by = c("tractid" = "geoid20")) %>%
     replace(is.na(.), 0) %>% 
     select(-year_built) %>% 
     arrange(tractid)
@@ -530,7 +548,7 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
 # Write to xlsx
 file_name_county <- paste0("pierce_unit_estimates_county_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 file_name_juris <- paste0("pierce_unit_estimates_juris_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
-file_name_tract <- paste0("pierce_unit_estimates_tract10_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+file_name_tract <- paste0("pierce_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 write_xlsx(x = county_units, path = paste0(output_file_path, file_name_county))
 write_xlsx(x = juris_units, path = paste0(output_file_path, file_name_juris))
