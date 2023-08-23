@@ -434,7 +434,9 @@ current_base_join$new_units <- if_else(current_base_join$development %in% c("new
                                        current_base_join$units, 0)
 
 #### UNIQUE TO THIS DATA!
-current_base_join$development[current_base_join$current_prcl == "6025250981"] <- "new"
+current_base_join$development[current_base_join$current_prcl %in% c("6025250981", "2017130042", "7001880160", "4002890018",
+                                                                    "4002890022", "4002890023", "4002890026", "4002890028",
+                                                                    "4002890029", "4002890031", "4002890034")] <- "new"
 ####
 
 demos <- current_base_join %>% 
@@ -442,7 +444,7 @@ demos <- current_base_join %>%
   distinct(base_prcl, .keep_all = TRUE) %>% 
   mutate(demo_units = base_units * -1)
 
-rm(current_year_join, base_year_join, base_pins)
+rm(base_pins)
 
 
 # Create net unit output tables ---------------------------------------------------------------
