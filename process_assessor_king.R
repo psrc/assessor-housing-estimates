@@ -9,17 +9,17 @@ library(rlist)
 #Current Year Processing
 
 # Data directories
-data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/data_research_phase"
+data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2023"
 current_data_dir <- file.path(data_dir, "extracts/current")
 base_data_dir <- file.path(data_dir, "extracts/base_year_2009")
 inputs_data_dir <- file.path(data_dir, "script_inputs")
 outputs_data_dir <- file.path(data_dir, "script_outputs")
 
 # file names
-id_files <- list(pin_translation = "PIN_Translation_2021_2009.csv",
+id_files <- list(pin_translation = "PIN_Translation_2022_2009.csv",
                  city_tract = "city_tract.csv",
                  full_city_list = "full_city_list.csv",
-                 full_tract_list = "full_tract10_list.csv")
+                 full_tract_list = "full_tract20_list.csv")
                  
 bldg_files <- list(apts = "EXTR_AptComplex.csv",
                  resbldgs = "EXTR_ResBldg.csv",
@@ -94,11 +94,11 @@ bldg_dfs[['resbldgs']]$nbrunits <- bldg_dfs[['resbldgs']]$nbrlivingunits
 # Summarize residential/commercial buildings by Parcel to remove duplicate pins
 bldg_dfs[['resbldgs']] <- bldg_dfs[['resbldgs']] %>%
   group_by(pin) %>%
-  summarise(nbrunits=sum(nbrunits),nbrbldgs=NROW(pin),yrbuilt=min(yrbuilt),yrrenovated=min(yrrenovated),address=first(address),zipcode=first(zipcode),table="resbldg")
+  summarise(nbrunits=sum(nbrunits),nbrbldgs=NROW(pin),yrbuilt=max(yrbuilt),yrrenovated=min(yrrenovated),address=first(address),zipcode=first(zipcode),table="resbldg")
 
 bldg_dfs[['comm_bldg']] <- bldg_dfs[['comm_bldg']] %>%
   group_by(pin )%>%
-  summarise(nbrbldgs=NROW(pin),yrbuilt=min(yrbuilt),address=first(address),zipcode=first(zipcode),Table="Commercial")
+  summarise(nbrbldgs=NROW(pin),yrbuilt=max(yrbuilt),address=first(address),zipcode=first(zipcode),Table="Commercial")
 
 # Remove commercial-only condo complexes and denotes any complex type that is a mobile home or floating home
 bldg_dfs[['condo_complex']] <- filter(bldg_dfs[['condo_complex']],!complextype %in% c(3,8)) %>%
@@ -115,8 +115,8 @@ sec_use <- bldg_dfs[['comm_bldg_section']] %>%
 sec_use_apts <- left_join(bldg_dfs[['apts']], sec_use, by = 'pin')
 
 # section uses by group
-res <- c(300,984,352,348,596,587,351)
-gq <- c(982,321,324,424,451,710,589,551,985,782,784,783)
+res <- c(300,984,352,348,351,459)
+gq <- c(982,321,324,424,451,710,589,551,313,335)
 
 # create new intermediate column 'unit_category' and apply criteria with case_when().
 # result is one-to-many table
@@ -187,8 +187,8 @@ sec_use_09 <- bldg_dfs[['comm_bldg_section_09']] %>%
 sec_use_apts_09 <- left_join(bldg_dfs[['apts_09']], sec_use_09, by = 'pin')
 
 # section uses by group
-res_09 <- c(300,348,352,551)
-gq_09 <- c(321,323,324,335,424,451)
+res_09 <- c(300,348,352,551,459)
+gq_09 <- c(321,323,324,335,424,451,313)
 
 # create new intermediate column 'unit_category' and apply criteria with case_when().
 # result is one-to-many table
@@ -244,19 +244,16 @@ joined_pins <- merge(current_res_merge,base_res_merge,by.x="pin",by.y="pin_09",a
   joined_pins$join_method <- "table"
 
 current_res_merge <- merge(current_res_merge,joined_pins,by.x="pin",by.y="pin_join",all=TRUE)
+current_res_merge$join_method[is.na(current_res_merge$join_method)] <- "spatial join"
 
 id_dfs[['pin_translation']]$pin_2009 <- as.character(id_dfs[['pin_translation']]$pin_2009)
 id_dfs[['pin_translation']]$pin <- as.character(id_dfs[['pin_translation']]$pin)
 
-# Joins GIS pin translation table to the current records
+# Joins GIS pin translation table to the current records and populates pin_2009 field
 current_res_merge <- current_res_merge %>%
   left_join(select(id_dfs[['pin_translation']],pin,pin_2009),by=c("pin"))
 
-# Populates the remaining 2009 pin column NAs with current year pins
-current_res_merge$pin_2009[is.na(current_res_merge$pin_2009)] <- current_res_merge$pin[is.na(current_res_merge$pin_2009)]
-
-# Updates the Join_Method column to specify which records were assigned 2009 pins from GIS spatial join method
-current_res_merge$join_method[is.na(current_res_merge$join_method)] <- "spatial join"
+current_res_merge$pin_2009[current_res_merge$join_method=='table'] <- current_res_merge$pin[current_res_merge$join_method=='table']
 
 # Joins base record attributes to current records  and cleans up columns in output
 base_current_join <- left_join(current_res_merge,base_res_merge,by=c("pin_2009"="pin_09")) %>%
@@ -322,8 +319,42 @@ id_dfs[['city_tract']]$juris[id_dfs[['city_tract']]$juris == 'Tacoma'] <- "Feder
 # Adds city/tract fields and filters for relevant years in time series
 base_current_join <- base_current_join %>%
   left_join(id_dfs[['city_tract']],by='pin') %>%
-  filter(yrbuilt %in% c(2010:2019)) %>%
+  filter(yrbuilt %in% c(2010:2022)) %>%
   mutate(juris = ifelse(is.na(juris),'Z-Missing',juris))
+
+# Adds tract/jurisdiction information to PIN records that aren't found in the parcel shapefile 
+#(NOTE: This will need to be continually updated with new cases.Also review the 'Z-Missing' records to make sure they still correspond the the PINS below)
+base_current_join$geoid20[base_current_join$pin == '1234567890'] <- 53033023601
+base_current_join$geoid20[base_current_join$pin == '1355300049'] <- 53033007502
+base_current_join$geoid20[base_current_join$pin == '1355300051'] <- 53033007502
+base_current_join$geoid20[base_current_join$pin == '2426039037'] <- 53033000403
+base_current_join$geoid20[base_current_join$pin == '2603230000'] <- 53033005801
+base_current_join$geoid20[base_current_join$pin == '2700600050'] <- 53033032704
+base_current_join$geoid20[base_current_join$pin == '3235350040'] <- 53033020700
+base_current_join$geoid20[base_current_join$pin == '3528900970'] <- 53033006000
+base_current_join$geoid20[base_current_join$pin == '3528900980'] <- 53033006000
+base_current_join$geoid20[base_current_join$pin == '3904100040'] <- 53033011101
+base_current_join$geoid20[base_current_join$pin == '6163900410'] <- 53033020500
+base_current_join$geoid20[base_current_join$pin == '8120200000'] <- 53033025803
+
+base_current_join$districtname <- str_to_title(base_current_join$districtname)
+base_current_join$juris[base_current_join$juris == 'Z-Missing'] <- base_current_join$districtname[base_current_join$juris == 'Z-Missing']
+base_current_join$juris[base_current_join$juris == 'Seatac'] <- 'SeaTac'
+
+# Reclassifies certain developments that need to be corrected (manual review of the highest demolition counts is needed as some of them are not actually demolitions)
+base_current_join$demolition[base_current_join$pin_2009 == '1978200470'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '1978200470'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '0623049257'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '0623049257'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '2354600000'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '2354600000'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '7954000005'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '7954000005'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '1926049216'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '1926049216'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '3388360000'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '3388360000'] <- "new development"
+
 
 # Creates a demolitions table that removes the duplication found in the joined current-base table
 demos <- base_current_join %>%
@@ -348,10 +379,10 @@ format_cities <- function(x) {
 
 format_tracts <- function(x) {
   x %>%
-    full_join(id_dfs[['full_tract_list']],by='geoid10') %>%
+    full_join(id_dfs[['full_tract_list']],by='geoid20') %>%
     replace(is.na(.), 0) %>%
-    relocate(net_total, .after = geoid10) %>%
-    arrange(geoid10)
+    relocate(net_total, .after = geoid20) %>%
+    arrange(geoid20)
 }
 
 # Creates final net change summaries by county/jurisdiction/tract
@@ -371,7 +402,7 @@ total_net_summary <- full_join(new_total, lost_total, by = join_by("yrbuilt", "s
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
-                           levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
+                           levels = c("single family detached", "single family attached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
   pivot_wider(id_cols = c(yrbuilt),
               names_from = str_type,
               names_sort = TRUE,
@@ -396,7 +427,7 @@ city_net_summary <- full_join(new_city, lost_city, by = join_by("juris","yrbuilt
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
-                           levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
+                           levels = c("single family detached", "single family attached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
   pivot_wider(id_cols = c(yrbuilt,juris),
               names_from = str_type,
               names_sort = TRUE,
@@ -408,21 +439,21 @@ city_net_summary <- full_join(new_city, lost_city, by = join_by("juris","yrbuilt
 
 #tract
 new_tract <- base_current_join %>%
-  group_by(geoid10,structure_type,yrbuilt) %>%
+  group_by(geoid20,structure_type,yrbuilt) %>%
   rename(str_type=structure_type) %>%
   summarise(new_units=sum(nbrunits))
 
 lost_tract <- demos %>%
-  group_by(geoid10,structure_type_09,yrbuilt) %>%
+  group_by(geoid20,structure_type_09,yrbuilt) %>%
   rename(str_type=structure_type_09) %>%
   summarise(lost_units=sum(demo_units))
 
-tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid10","yrbuilt", "str_type")) %>%
+tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yrbuilt", "str_type")) %>%
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
-                           levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
-  pivot_wider(id_cols = c(yrbuilt,geoid10),
+                           levels = c("single family detached", "single family attached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
+  pivot_wider(id_cols = c(yrbuilt,geoid20),
               names_from = str_type,
               names_sort = TRUE,
               values_from = net_units,
@@ -435,5 +466,3 @@ tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid10","yr
 write_xlsx(total_net_summary,file.path(outputs_data_dir,"totals.xlsx"))
 write_xlsx(city_net_summary,file.path(outputs_data_dir,"city.xlsx"))
 write_xlsx(tract_net_summary,file.path(outputs_data_dir,"tract.xlsx"))
-
-## 'Z-Missing' in the city summaries and geoid10=0 in the tract summaries represents totals for PIN records not found in the parcel shapefile so they were not assigned a city or tract. These numbers will have to be manually assigned in the final spreadsheet

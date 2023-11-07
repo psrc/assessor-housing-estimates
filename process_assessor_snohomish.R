@@ -7,14 +7,14 @@ library(data.table)
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
   
 # Data directories
-data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/data_research_phase"
+data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2023"
 input_dir <- file.path(data_dir, "script_inputs")
 output_dir <- file.path(data_dir, "script_outputs")
 
 # file names
 current_base_join_file_name <- "current_base_join_gis_output.csv"
 full_city_list_file_name <- "full_city_list.csv"
-full_tract_list_file_name <- "full_tract10_list.csv"
+full_tract_list_file_name <- "full_tract20_list.csv"
 
 # Import input file csv
 current_base_join <- read.csv(file.path(input_dir, current_base_join_file_name))
@@ -114,7 +114,7 @@ current_base_join$units_10[current_base_join$demolition!=1] <- 0
 current_base_join_final <- current_base_join %>%
   filter(is.na(mobile_home_park)) %>%
   filter(is.na(mobile_home_park_10)) %>%
-  filter(yrbuilt %in% c(2011,2012,2013,2014,2015,2016,2017,2018,2019))
+  filter(yrbuilt %in% c(2011:2022))
 
 # Creates a demolitions table that removes the duplication found in the joined current-base table
 demos <- current_base_join_final %>%
@@ -132,18 +132,18 @@ format_total <- function(x) {
  
 format_cities <- function(x) {
   x %>%
-    full_join(full_city_list,by='city_name') %>%
+    full_join(full_city_list,by='jurisdiction') %>%
     replace(is.na(.), 0) %>%
-    relocate(net_total, .after = city_name) %>%
-    arrange(city_name)
+    relocate(net_total, .after = jurisdiction) %>%
+    arrange(jurisdiction)
 }
 
 format_tracts <- function(x) {
   x %>%
-    full_join(full_tract_list,by='geoid10') %>%
+    full_join(full_tract_list,by='geoid20') %>%
     replace(is.na(.), 0) %>%
-    relocate(net_total, .after = geoid10) %>%
-    arrange(geoid10)
+    relocate(net_total, .after = geoid20) %>%
+    arrange(geoid20)
 }
 
 ## Creates final net change summaries by county/jurisdiction/tract
@@ -176,21 +176,21 @@ total_net_summary <- full_join(new_total, lost_total, by = join_by("yrbuilt", "s
 
 #city
 new_city <- current_base_join_final %>%
-    group_by(city_name,structure_type,yrbuilt) %>%
+    group_by(jurisdiction,structure_type,yrbuilt) %>%
     rename(str_type=structure_type) %>%
     summarise(new_units=sum(new_units))
 
 lost_city <- demos %>%
-    group_by(city_name,structure_type_10,yrbuilt) %>%
+    group_by(jurisdiction,structure_type_10,yrbuilt) %>%
     rename(str_type=structure_type_10) %>%
     summarise(lost_units=sum(units_10))
 
-city_net_summary <- full_join(new_city, lost_city, by = join_by("city_name","yrbuilt", "str_type")) %>%
+city_net_summary <- full_join(new_city, lost_city, by = join_by("jurisdiction","yrbuilt", "str_type")) %>%
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
                                  levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
-  pivot_wider(id_cols = c(yrbuilt,city_name),
+  pivot_wider(id_cols = c(yrbuilt,jurisdiction),
               names_from = str_type,
               names_sort = TRUE,
               values_from = net_units,
@@ -201,21 +201,21 @@ city_net_summary <- full_join(new_city, lost_city, by = join_by("city_name","yrb
 
 #tract
 new_tract <- current_base_join_final %>%
-    group_by(geoid10,structure_type,yrbuilt) %>%
+    group_by(geoid20,structure_type,yrbuilt) %>%
     rename(str_type=structure_type) %>%
     summarise(new_units=sum(new_units))
 
 lost_tract <- demos %>%
-    group_by(geoid10,structure_type_10,yrbuilt) %>%
+    group_by(geoid20,structure_type_10,yrbuilt) %>%
     rename(str_type=structure_type_10) %>%
     summarise(lost_units=sum(units_10))
 
-tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid10","yrbuilt", "str_type")) %>%
+tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yrbuilt", "str_type")) %>%
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
                            levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
-  pivot_wider(id_cols = c(yrbuilt,geoid10),
+  pivot_wider(id_cols = c(yrbuilt,geoid20),
               names_from = str_type,
               names_sort = TRUE,
               values_from = net_units,
