@@ -437,7 +437,10 @@ current_base_join$new_units <- if_else(current_base_join$development %in% c("new
 current_base_join$development[current_base_join$current_prcl %in% c("6025250981", "2017130042", "7001880160",
                                                                     "4002890018", "4002890022", "4002890023",
                                                                     "4002890026", "4002890028", "4002890029",
-                                                                    "4002890031", "4002890034", "2038190080")] <- "new"
+                                                                    "4002890031", "4002890034", "2038190080",
+                                                                    "5340000080", "2200002541", "3873000080")] <- "new"
+
+current_base_join$development[current_base_join$current_prcl %in% c("3905000023")] <- "rebuild"
 ####
 
 demos <- current_base_join %>% 
