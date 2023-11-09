@@ -105,7 +105,8 @@ base_appraisal <- read_csv(paste0(base_file_path, base_appraisal_file_name),
 # This is created in ArcMap prior to R processing, using psrc_region layer
 parcels_current_base <- st_read(paste0(current_shapefile_path, current_base_shapefile_name),
                              crs = 2285, stringsAsFactors = FALSE) %>% 
-  rename(current_prcl = taxparceln)
+  rename(current_prcl = taxparceln) %>% 
+  mutate(juris = ifelse(juris == "Dupont", "DuPont", juris))
 
 # Read in base year condo parcel shapefile with base parcel PINs
 # This is created in ArcMap prior to R processing
@@ -257,8 +258,8 @@ current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
 
 
 current_year_join$str_type <- ordered(current_year_join$str_type,
-                                      levels = c("SFA",
-                                                 "SFD",
+                                      levels = c("SFD",
+                                                 "SFA",
                                                  "MF2-4",
                                                  "MF5-9",
                                                  "MF10-19",
@@ -379,8 +380,8 @@ base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
                                        "MF50+", base_year_join$base_str_type)
 
 base_year_join$base_str_type <- ordered(base_year_join$base_str_type,
-                                        levels = c("SFA",
-                                                   "SFD",
+                                        levels = c("SFD",
+                                                   "SFA",
                                                    "MF2-4",
                                                    "MF5-9",
                                                    "MF10-19",
@@ -471,13 +472,13 @@ county_units <- full_join(new_units_county, demo_units_county, by = join_by("yea
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFA", "SFD", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
   pivot_wider(id_cols = year_built,
               names_from = structure_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFA)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFD)
 
 # Juris
 format_juris <- function(x) {
@@ -505,13 +506,13 @@ juris_units <- full_join(new_units_juris, demo_units_juris, by = join_by("juris"
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFA", "SFD", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
   pivot_wider(id_cols = c(year_built, juris),
               names_from = structure_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFA) %>% 
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFD) %>% 
   split(., .$year_built) %>% 
   lapply(format_juris)
 
@@ -541,13 +542,13 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFA", "SFD", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
   pivot_wider(id_cols = c(year_built, tractid),
               names_from = structure_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFA) %>% 
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFD) %>% 
   split(., .$year_built) %>% 
   lapply(format_tracts)
 
