@@ -16,50 +16,45 @@ geo_conn <- dbConnect(odbc::odbc(),
 )
 
 # source data file paths
-current_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/research_phase/extracts/current_year/"
-current_file_name <- "KITSAP_PARCEL_DWELLING_DETAILS_03292022.xlsx"
+current_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/2023/extracts/"
+current_file_name <- "KITSAP_COUNTY_PARCELS_01172024.shp"
 
-base_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/research_phase/extracts/base_year/"
+base_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/base_year/extracts/"
 base_file_name <- "Kitsap_Housing_2011.xlsx"
 base_improvements_name <- "improvements.csv"
 
-parcels_current_base_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/research_phase/script_inputs/"
-parcels_current_base_name <- "kitsap_parcels_current_base.csv"
+current_base_shapefile_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/2023/GIS/"
+current_base_shapefile_name <- "parcels_2023_2010_region22_tract20.shp"
 
-output_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/research_phase/script_outputs/"
+output_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/2023/script_outputs/"
+
+juris_query <- "SELECT juris, feat_type FROM ElmerGeo.dbo.PSRC_REGION WHERE cnty_name = 'Kitsap' AND feat_type <> 'water'"
+
+tract_query <- "SELECT geoid20 FROM ElmerGeo.dbo.TRACT2020 WHERE county_name = 'Kitsap'"
 
 year_start <- 2010
-year_end <- 2019
+year_end <- 2022
 
 
 # Load data from source -----------------------------------------------------------------------
 
-juris <- dbGetQuery(geo_conn,
-                    "SELECT juris, feat_type FROM ElmerGeo.dbo.PSRC_REGION
-                     WHERE cnty_name = 'Kitsap' AND feat_type <> 'water'") %>% 
+juris <- dbGetQuery(geo_conn, juris_query) %>% 
   mutate(juris = ifelse(feat_type %in% c("uninc", "rural"), "Unincorporated Kitsap", juris)) %>% 
   select(-feat_type) %>% 
   distinct() %>% 
   arrange()
 
-tracts <- dbGetQuery(geo_conn,
-                     "SELECT geoid10 FROM ElmerGeo.dbo.TRACT2010 WHERE county_name = 'Kitsap'")
+tracts <- dbGetQuery(geo_conn, tract_query)
 
 dbDisconnect(geo_conn)
 rm(geo_conn)
 
-current_year <- read_xlsx(paste0(current_file_path, current_file_name)) %>% 
+current_year <- st_read(paste0(current_file_path, current_file_name),
+                        crs = 2285, stringsAsFactors = FALSE) %>% 
+  st_drop_geometry() %>% 
+  filter(YEAR_BUILT >= year_start & YEAR_BUILT <= year_end) %>% 
   mutate(RP_ACCT_ID = as.character(RP_ACCT_ID),
          ACCT_NO = str_remove_all(ACCT_NO, "-"))
-
-parcels_current_base <- read_csv(paste0(parcels_current_base_path, parcels_current_base_name),
-                                 col_types = cols(
-                                   rp_acct_id = col_character(),
-                                   base_rid = col_character()
-                                 )) %>%
-  filter(!(rp_acct_id == "0")) %>% 
-  mutate(base_rid = ifelse(base_rid == "0", rp_acct_id, base_rid)) %>% 
-  distinct()
 
 base_year <- read_xlsx(paste0(base_file_path, base_file_name)) %>% 
   mutate(RP_ACCT_ID = as.character(RP_ACCT_ID),
@@ -73,32 +68,49 @@ base_improvements <- read_csv(paste0(base_file_path, base_improvements_name),
   mutate(IMP_TYPE = ifelse(IMP_TYPE == "CABIN", "DWELL", IMP_TYPE),
          ACCT_NO = str_remove_all(ACCT_NO, "-"))
 
-# replace below with ElmerGeo-R process?
-parcels_tract <- st_read("H:/Projects/Assessor/Kitsap/GIS/kitsap_parcels_tract10_juris.shp",
-                         crs = 2285, stringsAsFactors = FALSE) %>% 
+# Read in current year base parcel shapefile with 2010 PINs
+# This is created in ArcMap prior to R processing, using psrc_region layer
+parcels_current_base <- st_read(paste0(current_base_shapefile_path, current_base_shapefile_name),
+                                crs = 2285, stringsAsFactors = FALSE) %>% 
   st_drop_geometry() %>% 
-  filter(!(rp_acct_id == 0)) %>% 
+  filter(RP_ACCT_ID != 0) %>% 
+  mutate(RP_ACCT_ID = as.character(RP_ACCT_ID),
+         base_rid = as.character(base_rid)) %>% 
+  mutate(base_rid = ifelse(base_rid == "0", RP_ACCT_ID, base_rid)) %>% 
+  rename(current_rid = RP_ACCT_ID) %>% 
+  distinct()
+
+# Read in dwellings table from July 2023 extract and filter for townhouse designation
+townhouses <- read_delim("J:/Projects/Assessor/extracts/2023/July_23/Kitsap/Dwellings.txt",
+                         delim = "\t",
+                         col_types = cols(
+                           rp_acct_id = col_character()
+                         )) %>% 
+  filter(house_type == "146 Townhouse"
+         # & yr_blt >= year_start
+  ) %>% 
   group_by(rp_acct_id) %>% 
-  summarize(tract10 = first(tract10),
-            tractid = first(tractid),
-            juris = first(juris)) %>% 
-  mutate(rp_acct_id = as.character(rp_acct_id))
+  summarize(house_type = "townhouse",
+            # yr_blt = list(unique(yr_blt)),
+            bldgs = NROW(rp_acct_id))
 
 
 # Aggregate & transform current year data -----------------------------------------------------
 
-current_year_condos <- filter(current_year,
-                              PROP_CLASS == "141" & YEAR_BUILT >= year_start & YEAR_BUILT <= year_end)
+current_year_condos <- filter(current_year, PROP_CLASS == "141")
+
+# n_distinct(current_year_condos$RP_ACCT_ID)  # 24
+# all SF; incorporate into summary table
 
 # summarize current year table by RP_ACCT_ID
 current_year_sum <- current_year %>% 
   filter(PROP_CLASS %in% c("111", "118", "119", "121", "122", "123",
                            "131", "132", "133", "134", "135", "136",
-                           "137", "138", "180", "198")
-         & YEAR_BUILT >= year_start & YEAR_BUILT <= year_end) %>% 
+                           "137", "138", "180", "198")) %>% 
+  bind_rows(., current_year_condos) %>% 
   group_by(RP_ACCT_ID) %>% 
   summarize(ACCT_NO = first(ACCT_NO),
-            units = sum(NUM_DWELL),
+            units = sum(TOTAL_UNIT),
             buildings = ifelse(NUM_COMM > 0 & PROP_CLASS != "111", sum(NUM_COMM), sum(NUM_DWELL)),
             years = list(sort(unique(YEAR_BUILT))),
             year_count = n_distinct(YEAR_BUILT),
@@ -116,8 +128,22 @@ current_year_sum <- current_year %>%
   ) %>% 
   mutate(buildings = ifelse(buildings == 0, 1, buildings))
 
+# left join to townhouse table
+current_year_sum <- left_join(current_year_sum, townhouses, by = c("RP_ACCT_ID" = "rp_acct_id")) %>% 
+  select(-bldgs)
+
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 current_year_sum$units[current_year_sum$RP_ACCT_ID == "2561223"] <- 35
+
+# fix building count based on townhouse records
+current_year_sum$buildings[current_year_sum$RP_ACCT_ID == "2414415"] <- 7
+current_year_sum$house_type[current_year_sum$RP_ACCT_ID == "2414415"] <- NA
+
+# delete records with 0 units (unfinished construction)
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "1490747"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2647287"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2680080"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2687820"), ]
 ####
 
 current_year_sum$units_per_bldg <- round(current_year_sum$units / current_year_sum$buildings, 0)
@@ -125,6 +151,7 @@ current_year_sum$units_per_bldg <- round(current_year_sum$units / current_year_s
 # create structure type based on property classes or units per building
 current_year_sum$str_type <- case_when(
   current_year_sum$prop_classes %in% c("118", "119") ~ "MH",
+  current_year_sum$house_type == "townhouse" ~ "SFA",
   current_year_sum$units_per_bldg == 1 ~ "SFD",
   current_year_sum$units_per_bldg >= 2 & current_year_sum$units_per_bldg <= 4 ~ "MF2-4",
   current_year_sum$units_per_bldg >= 5 & current_year_sum$units_per_bldg <= 9 ~ "MF5-9",
@@ -135,6 +162,7 @@ current_year_sum$str_type <- case_when(
 
 current_year_sum$str_type <- ordered(current_year_sum$str_type,
                                      levels = c("SFD",
+                                                "SFA",
                                                 "MF2-4",
                                                 "MF5-9",
                                                 "MF10-19",
@@ -142,24 +170,39 @@ current_year_sum$str_type <- ordered(current_year_sum$str_type,
                                                 "MF50+",
                                                 "MH"))
 
-# join current year summary table to shapefile table to add 2010 tracts and juris
-current_year_sum <- left_join(current_year_sum, parcels_tract, by = c("RP_ACCT_ID" = "rp_acct_id"))
+# join current year summary table to shapefile table to add 2020 tracts and juris
+current_year_sum <- left_join(current_year_sum, parcels_current_base, by = c("RP_ACCT_ID" = "current_rid"))
 
-current_year_sum <- left_join(current_year_sum, parcels_current_base, by = c("RP_ACCT_ID" = "rp_acct_id"))
+#### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
+# parcel centroids didn't match to other polygons in ArcMap processing
+current_year_sum$juris[is.na(current_year_sum$juris)] <- "Unincorporated Kitsap"
 
-rm(current_year, parcels_current_base, parcels_tract)
+current_year_sum$tractid[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
+                                                            "2693406", "2693414", "2693448", "2693463")] <- "53035090102"
+current_year_sum$tract20[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
+                                                            "2693406", "2693414", "2693448", "2693463")] <- "901.02"
+
+current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2691178"] <- "53035092701"
+current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2691178"] <- "927.01"
+####
+
+rm(current_year, parcels_current_base)
 
 
 # Aggregate & transform base year data --------------------------------------------------------
 
 base_year_condos <- filter(base_year, PROP_CLASS == "141" & YEAR_BUILT < year_start)
 
+# n_distinct(base_year_condos$RP_ACCT_ID) # 54
+# all SF; incorporate into summary table
+
 improvements_baseyear <- base_improvements %>% 
   group_by(RP_ACCT_ID) %>% 
   summarize(year_built_a = max(YEAR_BUILT))
 
 # join assessor improvements table to base year parcel table to get accurate year_built
-base_year <- left_join(base_year, improvements_baseyear, by = c("RP_ACCT_ID" = "RP_ACCT_ID"))
+base_year <- bind_rows(base_year, base_year_condos) %>% 
+  left_join(., improvements_baseyear, by = c("RP_ACCT_ID" = "RP_ACCT_ID"))
 
 # summarize base year table by RP_ACCT_ID
 base_year_sum <- base_year %>% 
@@ -190,6 +233,10 @@ base_year_sum <- base_year %>%
                                 TRUE ~ base_units)) %>% 
   mutate(base_buildings = ifelse(base_prop_classes == "131" & base_units > 0, 1, base_buildings))
 
+# left join to townhouse table
+base_year_sum <- left_join(base_year_sum, townhouses, by = c("RP_ACCT_ID" = "rp_acct_id")) %>% 
+  select(-bldgs)
+
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 base_year_sum$base_buildings[base_year_sum$RP_ACCT_ID == "2135655"] <- 20
 base_year_sum$base_buildings[base_year_sum$RP_ACCT_ID == "2125912"] <- 10
@@ -201,6 +248,7 @@ base_year_sum$base_units_per_bldg <- round(base_year_sum$base_units / base_year_
 # create structure type based on property classes or units per building
 base_year_sum$base_str_type <- case_when(
   base_year_sum$base_prop_classes %in% c("118", "119") ~ "MH",
+  base_year_sum$house_type == "townhouse" ~ "SFA",
   base_year_sum$base_units_per_bldg == 1 ~ "SFD",
   base_year_sum$base_units_per_bldg >= 2 & base_year_sum$base_units_per_bldg <= 4 ~ "MF2-4",
   (base_year_sum$base_units_per_bldg >= 5 & base_year_sum$base_units_per_bldg <= 9)
@@ -236,6 +284,14 @@ current_base_join <- current_base_join %>%
                                  (year_built > base_year_built & units != base_units)
                                  | (year_built > base_year_built & base_pin_count > 1) ~ "redevelopment"))
 
+#### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
+# phased townhouse development
+current_base_join$development[current_base_join$RP_ACCT_ID %in% c("2453934", "2453942", "2453959", "2453967",
+                                                                  "2454064", "2454072", "2454080",
+                                                                  "2454098", "2454106", "2454114",
+                                                                  "2454122", "2454130", "2454148")] <- "new"
+####
+
 # Compute new units & demo units
 current_base_join$new_units <- if_else(current_base_join$development %in% c("new", "redevelopment"),
                                        current_base_join$units, 0)
@@ -245,17 +301,12 @@ demos <- current_base_join %>%
   distinct(base_rid, .keep_all = TRUE) %>% 
   mutate(demo_units = base_units * -1)
 
-current_base_join$juris <- ifelse(is.na(current_base_join$juris), "Unknown", current_base_join$juris)
-current_base_join$tractid <- ifelse(is.na(current_base_join$tractid), "Unknown", current_base_join$tractid)
-current_base_join$tract10 <- ifelse(is.na(current_base_join$tract10), "Unknown", current_base_join$tract10)
-
 current_base_join$juris <- ordered(current_base_join$juris,
                                    levels = c("Bainbridge Island",
                                               "Bremerton",
                                               "Port Orchard",
                                               "Poulsbo",
-                                              "Unincorporated Kitsap",
-                                              "Unknown"))
+                                              "Unincorporated Kitsap"))
 
 rm(base_pins)
 
@@ -280,7 +331,7 @@ county_units <- full_join(new_units_county, demo_units_county, by = join_by("yea
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFD", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
   pivot_wider(id_cols = year_built,
               names_from = structure_type,
               names_sort = TRUE,
