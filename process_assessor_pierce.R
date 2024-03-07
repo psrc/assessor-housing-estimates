@@ -161,9 +161,9 @@ current_year$units[is.na(current_year$units)] <- 1
 ####
 
 # Assign structure type based on built_as_id
-current_year$str_type <- case_when(current_year$built_as_id %in% c(14, 15, 16, 21) ~ "MH",
-                                   current_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 25) ~ "SFD",
-                                   current_year$built_as_id %in% c(61, 65, 67, 68) ~ "SFA")
+current_year$str_type <- case_when(current_year$built_as_id %in% c(14, 15, 16, 21) ~ "mobile homes",
+                                   current_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 25) ~ "single family detached",
+                                   current_year$built_as_id %in% c(61, 65, 67, 68) ~ "single family attached")
 
 # Create sf tables of current tables
 current_year_sf <- st_as_sf(current_year,
@@ -242,30 +242,30 @@ current_year_join$units_per_bldg <- round(current_year_join$units / current_year
 # Determine current year str_type by units_per_bldg
 current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
                                      & current_year_join$units_per_bldg >= 2 & current_year_join$units_per_bldg <= 4,
-                                     "MF2-4", current_year_join$str_type)
+                                     "multifamily 2-4 units", current_year_join$str_type)
 current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
                                      & current_year_join$units_per_bldg >= 5 & current_year_join$units_per_bldg <= 9,
-                                     "MF5-9", current_year_join$str_type)
+                                     "multifamily 5-9 units", current_year_join$str_type)
 current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
                                      & current_year_join$units_per_bldg >= 10 & current_year_join$units_per_bldg <= 19,
-                                     "MF10-19", current_year_join$str_type)
+                                     "multifamily 10-19 units", current_year_join$str_type)
 current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
                                      & current_year_join$units_per_bldg >= 20 & current_year_join$units_per_bldg <= 49,
-                                     "MF20-49", current_year_join$str_type)
+                                     "multifamily 20-49 units", current_year_join$str_type)
 current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
                                      & current_year_join$units_per_bldg >= 50,
-                                     "MF50+", current_year_join$str_type)
+                                     "multifamily 50+ units", current_year_join$str_type)
 
 
 current_year_join$str_type <- ordered(current_year_join$str_type,
-                                      levels = c("SFD",
-                                                 "SFA",
-                                                 "MF2-4",
-                                                 "MF5-9",
-                                                 "MF10-19",
-                                                 "MF20-49",
-                                                 "MF50+",
-                                                 "MH"))
+                                      levels = c("single family detached",
+                                                 "single family attached",
+                                                 "multifamily 2-4 units",
+                                                 "multifamily 5-9 units",
+                                                 "multifamily 10-19 units",
+                                                 "multifamily 20-49 units",
+                                                 "multifamily 50+ units",
+                                                 "mobile homes"))
 
 rm(current_appraisal, current_builtas, current_improvement, current_year, current_year_condos,
    current_year_sf, current_year_condos_sf, current_prcl_join, current_condos_prcl_join,
@@ -310,9 +310,9 @@ base_year <- base_year[!(base_year$built_as_id %in% c(352, 1459) & base_year$uni
 base_year_condos$units[base_year_condos$units == 0] <- 1
 
 # Assign structure type based on built_as_id
-base_year$base_str_type <- case_when(base_year$built_as_id %in% c(14, 15, 16, 21) ~ "MH",
-                                     base_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 25) ~ "SFD",
-                                     base_year$built_as_id %in% c(61, 65, 68) ~ "SFA")
+base_year$base_str_type <- case_when(base_year$built_as_id %in% c(14, 15, 16, 21) ~ "mobile homes",
+                                     base_year$built_as_id %in% c(1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 25) ~ "single family detached",
+                                     base_year$built_as_id %in% c(61, 65, 68) ~ "single family attached")
 
 # Pull data table from sf
 condo_parcels_base <- st_drop_geometry(condo_parcels_base) %>% 
@@ -365,29 +365,29 @@ base_year_join$base_units_per_bldg <- round(base_year_join$base_units / base_yea
 # Determine base year str_type by units_per_bldg
 base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
                                        & base_year_join$base_units_per_bldg >= 2 & base_year_join$base_units_per_bldg <= 4,
-                                       "MF2-4", base_year_join$base_str_type)
+                                       "multifamily 2-4 units", base_year_join$base_str_type)
 base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
                                        & base_year_join$base_units_per_bldg >= 5 & base_year_join$base_units_per_bldg <= 9,
-                                       "MF5-9", base_year_join$base_str_type)
+                                       "multifamily 5-9 units", base_year_join$base_str_type)
 base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
                                        & base_year_join$base_units_per_bldg >= 10 & base_year_join$base_units_per_bldg <= 19,
-                                       "MF10-19", base_year_join$base_str_type)
+                                       "multifamily 10-19 units", base_year_join$base_str_type)
 base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
                                        & base_year_join$base_units_per_bldg >= 20 & base_year_join$base_units_per_bldg <= 49,
-                                       "MF20-49", base_year_join$base_str_type)
+                                       "multifamily 20-49 units", base_year_join$base_str_type)
 base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
                                        & base_year_join$base_units_per_bldg >= 50,
-                                       "MF50+", base_year_join$base_str_type)
+                                       "multifamily 50+ units", base_year_join$base_str_type)
 
 base_year_join$base_str_type <- ordered(base_year_join$base_str_type,
-                                        levels = c("SFD",
-                                                   "SFA",
-                                                   "MF2-4",
-                                                   "MF5-9",
-                                                   "MF10-19",
-                                                   "MF20-49",
-                                                   "MF50+",
-                                                   "MH"))
+                                        levels = c("single family detached",
+                                                   "single family attached",
+                                                   "multifamily 2-4 units",
+                                                   "multifamily 5-9 units",
+                                                   "multifamily 10-19 units",
+                                                   "multifamily 20-49 units",
+                                                   "multifamily 50+ units",
+                                                   "mobile homes"))
 
 rm(base_appraisal, base_builtas, base_improvement, base_year, base_year_condos,
    base_year_sum, base_condos_join, base_year_condos_sum, condo_parcels_base)
@@ -406,12 +406,12 @@ current_base_join <- current_base_join[!is.na(current_base_join$current_prcl), ]
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 current_base_join$str_type[current_base_join$current_prcl %in% c("0022272011", "0416104046", "0417084029",
-                                                                 "0417173702", "0022251008", "5017101160")] <- "SFD"
-current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034", "0221068038")] <- "SFA"
-current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "MH"
+                                                                 "0417173702", "0022251008", "5017101160")] <- "single family detached"
+current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034", "0221068038")] <- "single family attached"
+current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "mobile homes"
 
-current_base_join$base_str_type[current_base_join$current_prcl == "4005000254"] <- "SFD"
-current_base_join$base_str_type[current_base_join$current_prcl == "2485400430"] <- "MH"
+current_base_join$base_str_type[current_base_join$current_prcl == "4005000254"] <- "single family detached"
+current_base_join$base_str_type[current_base_join$current_prcl == "2485400430"] <- "mobile homes"
 ####
 
 # Specify development type and demolition
@@ -472,13 +472,20 @@ county_units <- full_join(new_units_county, demo_units_county, by = join_by("yea
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("single family detached",
+                                            "single family attached",
+                                            "multifamily 2-4 units",
+                                            "multifamily 5-9 units",
+                                            "multifamily 10-19 units",
+                                            "multifamily 20-49 units",
+                                            "multifamily 50+ units",
+                                            "mobile homes"))) %>% 
   pivot_wider(id_cols = year_built,
               names_from = structure_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFD)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
 
 # Juris
 format_juris <- function(x) {
@@ -506,13 +513,20 @@ juris_units <- full_join(new_units_juris, demo_units_juris, by = join_by("juris"
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("single family detached",
+                                            "single family attached",
+                                            "multifamily 2-4 units",
+                                            "multifamily 5-9 units",
+                                            "multifamily 10-19 units",
+                                            "multifamily 20-49 units",
+                                            "multifamily 50+ units",
+                                            "mobile homes"))) %>% 
   pivot_wider(id_cols = c(year_built, juris),
               names_from = structure_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFD) %>% 
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
   split(., .$year_built) %>% 
   lapply(format_juris)
 
@@ -542,13 +556,20 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
   replace_na(list(new_unit_sum = 0, demo_unit_sum = 0)) %>% 
   mutate(net_units = new_unit_sum + demo_unit_sum,
          structure_type = factor(structure_type,
-                                 levels = c("SFD", "SFA", "MF2-4", "MF5-9", "MF10-19", "MF20-49", "MF50+", "MH"))) %>% 
+                                 levels = c("single family detached",
+                                            "single family attached",
+                                            "multifamily 2-4 units",
+                                            "multifamily 5-9 units",
+                                            "multifamily 10-19 units",
+                                            "multifamily 20-49 units",
+                                            "multifamily 50+ units",
+                                            "mobile homes"))) %>% 
   pivot_wider(id_cols = c(year_built, tractid),
               names_from = structure_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = SFD) %>% 
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
   split(., .$year_built) %>% 
   lapply(format_tracts)
 
