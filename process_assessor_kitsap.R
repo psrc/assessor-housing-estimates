@@ -72,13 +72,17 @@ base_improvements <- read_csv(paste0(base_file_path, base_improvements_name),
 # This is created in ArcMap prior to R processing, using psrc_region layer
 parcels_current_base <- st_read(paste0(current_base_shapefile_path, current_base_shapefile_name),
                                 crs = 2285, stringsAsFactors = FALSE) %>% 
-  st_drop_geometry() %>% 
+  st_drop_geometry() %>%
   filter(RP_ACCT_ID != 0) %>% 
   mutate(RP_ACCT_ID = as.character(RP_ACCT_ID),
          base_rid = as.character(base_rid)) %>% 
   mutate(base_rid = ifelse(base_rid == "0", RP_ACCT_ID, base_rid)) %>% 
   rename(current_rid = RP_ACCT_ID) %>% 
-  distinct()
+  distinct() #%>% 
+  # mutate(centroid = st_centroid(.$geometry),
+  #        point_on_surface = st_point_on_surface(.$geometry)) %>% 
+  # mutate(x_coord = st_coordinates(.$centroid)[,1],
+  #        y_coord = st_coordinates(.$centroid)[,2])
 
 # Read in dwellings table from July 2023 extract and filter for townhouse designation
 townhouses <- read_delim("J:/Projects/Assessor/extracts/2023/July_23/Kitsap/Dwellings.txt",
@@ -87,11 +91,9 @@ townhouses <- read_delim("J:/Projects/Assessor/extracts/2023/July_23/Kitsap/Dwel
                            rp_acct_id = col_character()
                          )) %>% 
   filter(house_type == "146 Townhouse"
-         # & yr_blt >= year_start
   ) %>% 
   group_by(rp_acct_id) %>% 
   summarize(house_type = "townhouse",
-            # yr_blt = list(unique(yr_blt)),
             bldgs = NROW(rp_acct_id))
 
 
@@ -279,8 +281,8 @@ base_pins <- current_base_join %>%
 current_base_join <- left_join(current_base_join, base_pins, by = c("base_rid" = "base_rid"))
 
 current_base_join <- current_base_join %>% 
-  mutate(development = case_when(is.na(base_year_built) ~ "new",
-                                 year_built > base_year_built & units == base_units & base_pin_count == 1 ~ "rebuild",
+  mutate(development = case_when(is.na(base_year_built) ~ "new development",
+                                 year_built > base_year_built & units == base_units & base_pin_count == 1 ~ "rebuild or remodel",
                                  (year_built > base_year_built & units != base_units)
                                  | (year_built > base_year_built & base_pin_count > 1) ~ "redevelopment"))
 
@@ -289,11 +291,11 @@ current_base_join <- current_base_join %>%
 current_base_join$development[current_base_join$RP_ACCT_ID %in% c("2453934", "2453942", "2453959", "2453967",
                                                                   "2454064", "2454072", "2454080",
                                                                   "2454098", "2454106", "2454114",
-                                                                  "2454122", "2454130", "2454148")] <- "new"
+                                                                  "2454122", "2454130", "2454148")] <- "new development"
 ####
 
 # Compute new units & demo units
-current_base_join$new_units <- if_else(current_base_join$development %in% c("new", "redevelopment"),
+current_base_join$new_units <- if_else(current_base_join$development %in% c("new development", "redevelopment"),
                                        current_base_join$units, 0)
 
 demos <- current_base_join %>% 
@@ -309,6 +311,40 @@ current_base_join$juris <- ordered(current_base_join$juris,
                                               "Unincorporated Kitsap"))
 
 rm(base_pins)
+
+
+# Create output for combined region process ---------------------------------------------------
+parcel_new <- current_base_join %>% 
+  mutate(project_year = 2023) %>% 
+  select(project_year,
+         pin = RP_ACCT_ID,
+         year = year_built,
+         units = new_units,
+         buildings,
+         structure_type = str_type,
+         development,
+         jurisdiction = juris,
+         geoid20 = tractid,
+         x_coord,
+         y_coord)
+
+parcel_demo <- demos %>% 
+  mutate(project_year = 2023,
+         development = "demolition") %>% 
+  select(project_year,
+         pin = base_rid,
+         units = demo_units,
+         buildings = base_buildings,
+         structure_type = base_str_type,
+         development,
+         jurisdiction = juris,
+         geoid20 = tractid,
+         x_coord,
+         y_coord)
+
+kitsap_parcel_tbl <- bind_rows(parcel_new, parcel_demo)
+
+save(kitsap_parcel_tbl, file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/kitsap_parcel.rda")
 
 
 # Create net unit output tables ---------------------------------------------------------------
@@ -435,7 +471,7 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
 # Write to xlsx
 file_name_county <- paste0("kitsap_unit_estimates_county_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 file_name_juris <- paste0("kitsap_unit_estimates_juris_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
-file_name_tract <- paste0("kitsap_unit_estimates_tract10_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+file_name_tract <- paste0("kitsap_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 write_xlsx(x = county_units, path = paste0(output_file_path, file_name_county))
 write_xlsx(x = juris_units, path = paste0(output_file_path, file_name_juris))
