@@ -329,6 +329,7 @@ parcel_new <- current_base_join %>%
          y_coord)
 
 parcel_demo <- demos %>% 
+  filter(demo_units != 0) %>% 
   mutate(project_year = 2023,
          development = "demolition") %>% 
   select(project_year,
