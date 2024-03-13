@@ -313,41 +313,6 @@ current_base_join$juris <- ordered(current_base_join$juris,
 rm(base_pins)
 
 
-# Create output for combined region process ---------------------------------------------------
-parcel_new <- current_base_join %>% 
-  mutate(project_year = 2023) %>% 
-  select(project_year,
-         pin = RP_ACCT_ID,
-         year = year_built,
-         units = new_units,
-         buildings,
-         structure_type = str_type,
-         development,
-         jurisdiction = juris,
-         geoid20 = tractid,
-         x_coord,
-         y_coord)
-
-parcel_demo <- demos %>% 
-  filter(demo_units != 0) %>% 
-  mutate(project_year = 2023,
-         development = "demolition") %>% 
-  select(project_year,
-         pin = base_rid,
-         units = demo_units,
-         buildings = base_buildings,
-         structure_type = base_str_type,
-         development,
-         jurisdiction = juris,
-         geoid20 = tractid,
-         x_coord,
-         y_coord)
-
-kitsap_parcel_tbl <- bind_rows(parcel_new, parcel_demo)
-
-save(kitsap_parcel_tbl, file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/kitsap_parcel.rda")
-
-
 # Create net unit output tables ---------------------------------------------------------------
 
 # County
@@ -422,9 +387,7 @@ juris_units <- full_join(new_units_juris, demo_units_juris, by = join_by("juris"
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
-  split(., .$year_built) %>% 
-  lapply(format_juris)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
 
 # Tract
 format_tracts <- function(x) {
@@ -465,9 +428,7 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
-  split(., .$year_built) %>% 
-  lapply(format_tracts)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
 
 # Write to xlsx
 file_name_county <- paste0("kitsap_unit_estimates_county_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
@@ -475,5 +436,77 @@ file_name_juris <- paste0("kitsap_unit_estimates_juris_", format(Sys.Date(), "%Y
 file_name_tract <- paste0("kitsap_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 write_xlsx(x = county_units, path = paste0(output_file_path, file_name_county))
-write_xlsx(x = juris_units, path = paste0(output_file_path, file_name_juris))
-write_xlsx(x = tract_units, path = paste0(output_file_path, file_name_tract))
+write_xlsx(x = split(juris_units, juris_units$year_built) %>% lapply(format_juris),
+           path = paste0(output_file_path, file_name_juris))
+write_xlsx(x = split(tract_units, tract_units$year_built) %>% lapply(format_tracts),
+           path = paste0(output_file_path, file_name_tract))
+
+
+# Create outputs for combined region processing -----------------------------------------------
+# parcel table for shapefile
+parcel_new <- current_base_join %>% 
+  mutate(project_year = 2023,
+         county = "Kitsap",
+         county_fips = "035") %>% 
+  select(project_year,
+         pin = RP_ACCT_ID,
+         year = year_built,
+         units = new_units,
+         buildings,
+         structure_type = str_type,
+         development,
+         jurisdiction = juris,
+         geoid20 = tractid,
+         county,
+         county_fips,
+         x_coord,
+         y_coord)
+
+parcel_demo <- demos %>% 
+  filter(demo_units != 0) %>% 
+  mutate(project_year = 2023,
+         county = "Kitsap",
+         county_fips = "035",
+         development = "demolition") %>% 
+  select(project_year,
+         pin = RP_ACCT_ID,
+         year = year_built,
+         units = demo_units,
+         buildings = base_buildings,
+         structure_type = base_str_type,
+         development,
+         jurisdiction = juris,
+         geoid20 = tractid,
+         county,
+         county_fips,
+         x_coord,
+         y_coord)
+
+kitsap_parcel_tbl <- bind_rows(parcel_new, parcel_demo)
+
+# summary tables for Elmer/Data Portal
+kitsap_county_units_long <- county_units %>% 
+  pivot_longer(cols = net_total:`mobile homes`,
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023, 
+         county = "Kitsap") %>% 
+  select(project_year, county, year = year_built, structure_type, net_units)
+
+kitsap_juris_units_long <- juris_units %>% 
+  pivot_longer(cols = net_total:`mobile homes`,
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023) %>% 
+  select(project_year, juris, year = year_built, structure_type, net_units)
+
+kitsap_tract_units_long <- tract_units %>% 
+  pivot_longer(cols = net_total:`mobile homes`,
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023) %>% 
+  select(project_year, tract = tractid, year = year_built, structure_type, net_units)
+
+# save tables to .rda for combining script
+save(kitsap_parcel_tbl, kitsap_county_units_long, kitsap_juris_units_long, kitsap_tract_units_long,
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/kitsap_tables.rda")
