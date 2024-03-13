@@ -424,14 +424,14 @@ base_pins <- current_base_join %>%
 current_base_join <- left_join(current_base_join, base_pins, by = c("base_prcl" = "base_prcl"))
 
 current_base_join <- current_base_join %>% 
-  mutate(development = case_when(is.na(base_year_built) ~ "new",
-                                 year_built > base_year_built & units == base_units & base_pin_count == 1 ~ "rebuild",
+  mutate(development = case_when(is.na(base_year_built) ~ "new development",
+                                 year_built > base_year_built & units == base_units & base_pin_count == 1 ~ "rebuild or remodel",
                                  (year_built > base_year_built & units != base_units)
                                  | (year_built > base_year_built & base_pin_count > 1) ~ "redevelopment")
   )
 
 # Compute new units, demo units
-current_base_join$new_units <- if_else(current_base_join$development %in% c("new", "redevelopment"),
+current_base_join$new_units <- if_else(current_base_join$development %in% c("new development", "redevelopment"),
                                        current_base_join$units, 0)
 
 #### UNIQUE TO THIS DATA!
@@ -439,9 +439,9 @@ current_base_join$development[current_base_join$current_prcl %in% c("6025250981"
                                                                     "4002890018", "4002890022", "4002890023",
                                                                     "4002890026", "4002890028", "4002890029",
                                                                     "4002890031", "4002890034", "2038190080",
-                                                                    "5340000080", "2200002541", "3873000080")] <- "new"
+                                                                    "5340000080", "2200002541", "3873000080")] <- "new development"
 
-current_base_join$development[current_base_join$current_prcl %in% c("3905000023")] <- "rebuild"
+current_base_join$development[current_base_join$current_prcl %in% c("3905000023")] <- "rebuild or remodel"
 ####
 
 demos <- current_base_join %>% 
@@ -526,9 +526,7 @@ juris_units <- full_join(new_units_juris, demo_units_juris, by = join_by("juris"
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
-  split(., .$year_built) %>% 
-  lapply(format_juris)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
 
 # Tract
 format_tracts <- function(x) {
@@ -569,9 +567,7 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
-  split(., .$year_built) %>% 
-  lapply(format_tracts)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
 
 # Write to xlsx
 file_name_county <- paste0("pierce_unit_estimates_county_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
@@ -579,5 +575,77 @@ file_name_juris <- paste0("pierce_unit_estimates_juris_", format(Sys.Date(), "%Y
 file_name_tract <- paste0("pierce_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 write_xlsx(x = county_units, path = paste0(output_file_path, file_name_county))
-write_xlsx(x = juris_units, path = paste0(output_file_path, file_name_juris))
-write_xlsx(x = tract_units, path = paste0(output_file_path, file_name_tract))
+write_xlsx(x = split(juris_units, juris_units$year_built) %>% lapply(format_juris),
+           path = paste0(output_file_path, file_name_juris))
+write_xlsx(x = split(tract_units, tract_units$year_built) %>% lapply(format_tracts),
+           path = paste0(output_file_path, file_name_tract))
+
+
+# Create output for combined region process ---------------------------------------------------
+# parcel table for shapefile
+parcel_new <- current_base_join %>% 
+  mutate(project_year = 2023,
+         county = "Pierce",
+         county_fips = "053") %>% 
+  select(project_year,
+         pin = current_prcl,
+         year = year_built,
+         units = new_units,
+         buildings,
+         structure_type = str_type,
+         development,
+         jurisdiction = juris,
+         geoid20 = tractid,
+         county,
+         county_fips,
+         x_coord,
+         y_coord)
+
+parcel_demo <- demos %>% 
+  filter(demo_units != 0) %>% 
+  mutate(project_year = 2023,
+         county = "Pierce",
+         county_fips = "053",
+         development = "demolition") %>% 
+  select(project_year,
+         pin = current_prcl,
+         year = year_built,
+         units = demo_units,
+         buildings = base_buildings,
+         structure_type = base_str_type,
+         development,
+         jurisdiction = juris,
+         geoid20 = tractid,
+         county,
+         county_fips,
+         x_coord,
+         y_coord)
+
+pierce_parcel_tbl <- bind_rows(parcel_new, parcel_demo)
+
+# summary tables for Elmer/Data Portal
+pierce_county_units_long <- county_units %>% 
+  pivot_longer(cols = net_total:`mobile homes`,
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023, 
+         county = "Pierce") %>% 
+  select(project_year, county, year = year_built, structure_type, net_units)
+
+pierce_juris_units_long <- juris_units %>% 
+  pivot_longer(cols = net_total:`mobile homes`,
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023) %>% 
+  select(project_year, juris, year = year_built, structure_type, net_units)
+
+pierce_tract_units_long <- tract_units %>% 
+  pivot_longer(cols = net_total:`mobile homes`,
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023) %>% 
+  select(project_year, tract = tractid, year = year_built, structure_type, net_units)
+
+# save tables to .rda for combining script
+save(pierce_parcel_tbl, pierce_county_units_long, pierce_juris_units_long, pierce_tract_units_long,
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/pierce_tables.rda")
