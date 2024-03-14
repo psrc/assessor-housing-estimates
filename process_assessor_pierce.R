@@ -206,7 +206,9 @@ current_year_sum <- current_prcl_join %>%
             base_prcl = first(base_prcl),
             juris = first(juris),
             tractid = first(tractid),
-            tract20 = first(tract20)
+            tract20 = first(tract20),
+            x_coord = first(x_coord),
+            y_coord = first(y_coord)
   ) %>% 
   distinct(current_prcl, .keep_all = TRUE)
 
@@ -230,7 +232,9 @@ current_year_condos_sum <- current_condos_prcl_join %>%
             base_prcl = first(base_prcl),
             juris = first(juris),
             tractid = first(tractid),
-            tract20 = first(tract20)
+            tract20 = first(tract20),
+            x_coord = first(x_coord),
+            y_coord = first(y_coord)
   )
 
 # Combine summarized tables
