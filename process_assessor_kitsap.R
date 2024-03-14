@@ -485,6 +485,20 @@ parcel_demo <- demos %>%
 kitsap_parcel_tbl <- bind_rows(parcel_new, parcel_demo)
 
 # summary tables for Elmer/Data Portal
+format_juris_long <- function(x) {
+  x %>%
+    full_join(juris, by = c("juris" = "juris")) %>%
+    replace(is.na(.), 0) %>% 
+    arrange(juris)
+}
+
+format_tracts_long <- function(x) {
+  x %>%
+    full_join(tracts, by = c("tractid" = "geoid20")) %>%
+    replace(is.na(.), 0) %>% 
+    arrange(tractid)
+}
+
 kitsap_county_units_long <- county_units %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
@@ -494,8 +508,9 @@ kitsap_county_units_long <- county_units %>%
   select(project_year, county, year = year_built, structure_type, net_units)
 
 kitsap_juris_units_long <- juris_units %>% 
-  full_join(juris, by = c("juris" = "juris")) %>%
-  replace(is.na(.), 0) %>% 
+  group_by(year_built) %>% 
+  group_modify(~ format_juris_long(.x)) %>% 
+  ungroup() %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
@@ -504,8 +519,9 @@ kitsap_juris_units_long <- juris_units %>%
   select(project_year, county, juris, year = year_built, structure_type, net_units)
 
 kitsap_tract_units_long <- tract_units %>% 
-  full_join(tracts, by = c("tractid" = "geoid20")) %>%
-  replace(is.na(.), 0) %>% 
+  group_by(year_built) %>% 
+  group_modify(~ format_tracts_long(.x)) %>% 
+  ungroup() %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
