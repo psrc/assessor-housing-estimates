@@ -636,15 +636,17 @@ pierce_juris_units_long <- juris_units %>%
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023) %>% 
-  select(project_year, juris, year = year_built, structure_type, net_units)
+  mutate(project_year = 2023, 
+         county = "Pierce") %>% 
+  select(project_year, county, juris, year = year_built, structure_type, net_units)
 
 pierce_tract_units_long <- tract_units %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023) %>% 
-  select(project_year, tract = tractid, year = year_built, structure_type, net_units)
+  mutate(project_year = 2023, 
+         county = "Pierce") %>% 
+  select(project_year, county, tract = tractid, year = year_built, structure_type, net_units)
 
 # save tables to .rda for combining script
 save(pierce_parcel_tbl, pierce_county_units_long, pierce_juris_units_long, pierce_tract_units_long,

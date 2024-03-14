@@ -497,15 +497,17 @@ kitsap_juris_units_long <- juris_units %>%
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023) %>% 
-  select(project_year, juris, year = year_built, structure_type, net_units)
+  mutate(project_year = 2023, 
+         county = "Kitsap") %>% 
+  select(project_year, county, juris, year = year_built, structure_type, net_units)
 
 kitsap_tract_units_long <- tract_units %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023) %>% 
-  select(project_year, tract = tractid, year = year_built, structure_type, net_units)
+  mutate(project_year = 2023, 
+         county = "Kitsap") %>% 
+  select(project_year, county, tract = tractid, year = year_built, structure_type, net_units)
 
 # save tables to .rda for combining script
 save(kitsap_parcel_tbl, kitsap_county_units_long, kitsap_juris_units_long, kitsap_tract_units_long,
