@@ -637,6 +637,8 @@ pierce_county_units_long <- county_units %>%
   select(project_year, county, year = year_built, structure_type, net_units)
 
 pierce_juris_units_long <- juris_units %>% 
+  full_join(juris, by = c("juris" = "juris")) %>%
+  replace(is.na(.), 0) %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
@@ -645,6 +647,8 @@ pierce_juris_units_long <- juris_units %>%
   select(project_year, county, juris, year = year_built, structure_type, net_units)
 
 pierce_tract_units_long <- tract_units %>% 
+  full_join(tracts, by = c("tractid" = "geoid20")) %>%
+  replace(is.na(.), 0) %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
