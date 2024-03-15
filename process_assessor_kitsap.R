@@ -353,7 +353,6 @@ format_juris <- function(x) {
   x %>%
     full_join(juris, by = c("juris" = "juris")) %>%
     replace(is.na(.), 0) %>% 
-    select(-year_built) %>% 
     arrange(juris)
 }
 
@@ -387,14 +386,16 @@ juris_units <- full_join(new_units_juris, demo_units_juris, by = join_by("juris"
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
+  group_by(year_built) %>% 
+  group_modify(~ format_juris(.x)) %>% 
+  ungroup()
 
 # Tract
 format_tracts <- function(x) {
   x %>%
     full_join(tracts, by = c("tractid" = "geoid20")) %>%
     replace(is.na(.), 0) %>% 
-    select(-year_built) %>% 
     arrange(tractid)
 }
 
@@ -428,7 +429,10 @@ tract_units <- full_join(new_units_tract, demo_units_tract, by = join_by("tracti
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`)
+  mutate(net_total = rowSums(across(where(is.numeric) & !year_built), na.rm = TRUE), .before = `single family detached`) %>% 
+  group_by(year_built) %>% 
+  group_modify(~ format_tracts(.x)) %>% 
+  ungroup()
 
 # Write to xlsx
 file_name_county <- paste0("kitsap_unit_estimates_county_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
@@ -436,9 +440,9 @@ file_name_juris <- paste0("kitsap_unit_estimates_juris_", format(Sys.Date(), "%Y
 file_name_tract <- paste0("kitsap_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 write_xlsx(x = county_units, path = paste0(output_file_path, file_name_county))
-write_xlsx(x = split(juris_units, juris_units$year_built) %>% lapply(format_juris),
+write_xlsx(x = split(juris_units, juris_units$year_built) %>% map(., ~ (.x %>% select(-year_built))),
            path = paste0(output_file_path, file_name_juris))
-write_xlsx(x = split(tract_units, tract_units$year_built) %>% lapply(format_tracts),
+write_xlsx(x = split(tract_units, tract_units$year_built) %>% map(., ~ (.x %>% select(-year_built))),
            path = paste0(output_file_path, file_name_tract))
 
 
@@ -485,20 +489,6 @@ parcel_demo <- demos %>%
 kitsap_parcel_tbl <- bind_rows(parcel_new, parcel_demo)
 
 # summary tables for Elmer/Data Portal
-format_juris_long <- function(x) {
-  x %>%
-    full_join(juris, by = c("juris" = "juris")) %>%
-    replace(is.na(.), 0) %>% 
-    arrange(juris)
-}
-
-format_tracts_long <- function(x) {
-  x %>%
-    full_join(tracts, by = c("tractid" = "geoid20")) %>%
-    replace(is.na(.), 0) %>% 
-    arrange(tractid)
-}
-
 kitsap_county_units_long <- county_units %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
@@ -508,9 +498,6 @@ kitsap_county_units_long <- county_units %>%
   select(project_year, county, year = year_built, structure_type, net_units)
 
 kitsap_juris_units_long <- juris_units %>% 
-  group_by(year_built) %>% 
-  group_modify(~ format_juris_long(.x)) %>% 
-  ungroup() %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
@@ -519,9 +506,6 @@ kitsap_juris_units_long <- juris_units %>%
   select(project_year, county, juris, year = year_built, structure_type, net_units)
 
 kitsap_tract_units_long <- tract_units %>% 
-  group_by(year_built) %>% 
-  group_modify(~ format_tracts_long(.x)) %>% 
-  ungroup() %>% 
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
