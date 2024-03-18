@@ -9,7 +9,7 @@ library(data.table)
 # Data directories
 data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2023"
 input_dir <- file.path(data_dir, "script_inputs")
-output_dir <- file.path(data_dir, "script_outputs")
+output_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2023/script_outputs/"
 
 # file names
 current_base_join_file_name <- "current_base_join_gis_output.csv"
@@ -66,7 +66,7 @@ base_pin_count <- current_base_join %>%
 # Joins number of occurrences of base pin field to the final table
 current_base_join <- left_join(current_base_join,base_pin_count,by = 'group_id_10')
 
- # Assigns activity type categories by comparing current year records against base year records
+# Assigns activity type categories by comparing current year records against base year records
 current_base_join$development[current_base_join$units_10==0] <- "new development"
 current_base_join$development[is.na(current_base_join$yrbuilt_10)] <- "new development"
 current_base_join$development[current_base_join$no_demolition == 1] <- "new development"
@@ -79,6 +79,7 @@ current_base_join$demolition[current_base_join$development == "redevelopment"] <
 current_base_join$demolition[current_base_join$development == "new development"] <- 0
 current_base_join$demolition[current_base_join$development == "rebuild or remodel"] <- 1
 current_base_join$demolition[current_base_join$no_demolition == 1] <- 0
+current_base_join$demolition[current_base_join$mobile_home_park_closure == 1] <- 1
 
 # Removes NAs from no_demolition field
 current_base_join$no_demolition[is.na(current_base_join$no_demolition)] <- 0
@@ -114,35 +115,33 @@ current_base_join$units_10[current_base_join$demolition!=1] <- 0
 current_base_join_final <- current_base_join %>%
   filter(is.na(mobile_home_park)) %>%
   filter(is.na(mobile_home_park_10)) %>%
-  filter(yrbuilt %in% c(2011:2022))
+  filter(yrbuilt %in% c(2011:2022)) %>%
+  rename('juris' = 'jurisdiction')
 
 # Creates a demolitions table that removes the duplication found in the joined current-base table
 demos <- current_base_join_final %>%
   filter(demolition==1) %>%
-  distinct(group_id_10,.keep_all=TRUE)
-  
+  distinct(group_id_10,.keep_all=TRUE) %>%
+  mutate(development = 'demolition')
 
+# Removes mobile home park closure records so they only show up in the demos table
+current_base_join_final <- current_base_join_final %>%
+  filter(mobile_home_park_closure != 1)
+  
 ## Creates functions to summarize the net change estimates by county total, jurisdiction, and census tract
 
 # These functions format the final tables and any missing cities/tracts that don't have data
-format_total <- function(x) {
-  x %>%
-    relocate(net_total, .after = yrbuilt)
-}
- 
 format_cities <- function(x) {
   x %>%
-    full_join(full_city_list,by='jurisdiction') %>%
+    full_join(full_city_list,by='juris') %>%
     replace(is.na(.), 0) %>%
-    relocate(net_total, .after = jurisdiction) %>%
-    arrange(jurisdiction)
+    arrange(juris)
 }
 
 format_tracts <- function(x) {
   x %>%
     full_join(full_tract_list,by='geoid20') %>%
     replace(is.na(.), 0) %>%
-    relocate(net_total, .after = geoid20) %>%
     arrange(geoid20)
 }
 
@@ -154,7 +153,6 @@ new_total <- current_base_join_final %>%
     rename(str_type=structure_type) %>%
     summarise(new_units=sum(new_units))
 
-
 lost_total <- demos %>%
     group_by(structure_type_10,yrbuilt) %>%
     rename(str_type=structure_type_10) %>%
@@ -164,40 +162,54 @@ total_net_summary <- full_join(new_total, lost_total, by = join_by("yrbuilt", "s
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
-                                 levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
+                                 levels = c("single family detached", 
+                                            "single family attached", 
+                                            "multifamily 2-4 units", 
+                                            "multifamily 5-9 units", 
+                                            "multifamily 10-19 units", 
+                                            "multifamily 20-49 units", 
+                                            "multifamily 50+ units", 
+                                            "mobile homes"))) %>% 
   pivot_wider(id_cols = c(yrbuilt),
               names_from = str_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !yrbuilt), na.rm=TRUE)) %>%
-  split(.,.$yrbuilt) %>%
-  lapply(format_total)
+  mutate(net_total = rowSums(across(where(is.numeric) & !yrbuilt), na.rm = TRUE), .before = `single family detached`)%>%
+  arrange(yrbuilt)
 
 #city
 new_city <- current_base_join_final %>%
-    group_by(jurisdiction,structure_type,yrbuilt) %>%
+    group_by(juris,structure_type,yrbuilt) %>%
     rename(str_type=structure_type) %>%
     summarise(new_units=sum(new_units))
 
 lost_city <- demos %>%
-    group_by(jurisdiction,structure_type_10,yrbuilt) %>%
+    group_by(juris,structure_type_10,yrbuilt) %>%
     rename(str_type=structure_type_10) %>%
     summarise(lost_units=sum(units_10))
 
-city_net_summary <- full_join(new_city, lost_city, by = join_by("jurisdiction","yrbuilt", "str_type")) %>%
+city_net_summary <- full_join(new_city, lost_city, by = join_by("juris","yrbuilt", "str_type")) %>%
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
-                                 levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
-  pivot_wider(id_cols = c(yrbuilt,jurisdiction),
+                                 levels = c("single family detached", 
+                                            "single family attached", 
+                                            "multifamily 2-4 units", 
+                                            "multifamily 5-9 units", 
+                                            "multifamily 10-19 units", 
+                                            "multifamily 20-49 units", 
+                                            "multifamily 50+ units", 
+                                            "mobile homes"))) %>% 
+  pivot_wider(id_cols = c(yrbuilt,juris),
               names_from = str_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !yrbuilt), na.rm=TRUE)) %>%
-  split(.,.$yrbuilt) %>%
-  lapply(format_cities)
+  mutate(net_total = rowSums(across(where(is.numeric) & !yrbuilt), na.rm = TRUE), .before = `single family detached`) %>%
+  group_by(yrbuilt) %>% 
+  group_modify(~ format_cities(.x)) %>% 
+  ungroup()
 
 #tract
 new_tract <- current_base_join_final %>%
@@ -214,18 +226,102 @@ tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yr
   replace_na(list(new_units = 0, lost_units = 0)) %>%
   mutate(net_units = new_units + lost_units,
          str_type = factor(str_type,
-                           levels = c("single family attached", "single family detached", "multifamily 2-4 units", "multifamily 5-9 units", "multifamily 10-19 units", "multifamily 20-49 units", "multifamily 50+ units", "mobile homes"))) %>% 
+                           levels = c("single family detached", 
+                                      "single family attached", 
+                                      "multifamily 2-4 units", 
+                                      "multifamily 5-9 units", 
+                                      "multifamily 10-19 units", 
+                                      "multifamily 20-49 units", 
+                                      "multifamily 50+ units", 
+                                      "mobile homes"))) %>% 
   pivot_wider(id_cols = c(yrbuilt,geoid20),
               names_from = str_type,
               names_sort = TRUE,
               values_from = net_units,
               values_fill = 0) %>% 
-  mutate(net_total = rowSums(across(where(is.numeric) & !yrbuilt), na.rm=TRUE)) %>%
-  split(.,.$yrbuilt) %>%
-  lapply(format_tracts)
+  mutate(net_total = rowSums(across(where(is.numeric) & !yrbuilt), na.rm = TRUE), .before = `single family detached`) %>% 
+  group_by(yrbuilt) %>% 
+  group_modify(~ format_tracts(.x)) %>%
+  ungroup()
+
+# Creates final parcel table
+new_unit_parcel_records <- current_base_join_final %>%
+  mutate(project_year = 2023) %>%
+  mutate(county = "Snohomish") %>%
+  mutate(county_fips = "061") %>%
+  mutate(pin=NA) %>%
+  select(project_year,
+         pin,
+         year = yrbuilt,
+         units,
+         buildings,
+         structure_type,
+         development,
+         jurisdiction = juris,
+         geoid20,
+         county,
+         county_fips,
+         x_coord = x,
+         y_coord = y)
+
+lost_unit_parcel_records <- demos %>%
+  mutate(project_year = 2023) %>%
+  mutate(county = "Snohomish") %>%
+  mutate(county_fips = "061") %>%
+  mutate(pin=NA) %>%
+  select(project_year,
+         pin,
+         year = yrbuilt,
+         units = units_10,
+         buildings = buildings_10,
+         structure_type = structure_type_10,
+         development,
+         jurisdiction = juris,
+         geoid20,
+         county,
+         county_fips,
+         x_coord = x,
+         y_coord = y)
+  
+snohomish_parcel_tbl <- rbind(new_unit_parcel_records,lost_unit_parcel_records)
+
+# Creates elmer-ready summary tables
+snohomish_county_units_long <- total_net_summary %>% 
+  pivot_longer(cols = 'net_total':'mobile homes',
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023, 
+         county = "Snohomish") %>% 
+  select(project_year, county, year = yrbuilt, structure_type, net_units)
+
+snohomish_juris_units_long <- city_net_summary %>%
+  pivot_longer(cols = 'net_total':'mobile homes',
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023, 
+         county = "Snohomish") %>% 
+  select(project_year, county, juris, year = yrbuilt, structure_type, net_units)
+
+snohomish_tract_units_long <- tract_net_summary %>%
+  pivot_longer(cols = 'net_total':'mobile homes',
+               names_to = "structure_type",
+               values_to = "net_units") %>% 
+  mutate(project_year = 2023, 
+         county = "Snohomish") %>% 
+  select(project_year, county, tract = geoid20, year = yrbuilt, structure_type, net_units)
+
+# Write to xlsx
+file_name_county <- paste0("snohomish_unit_estimates_county_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+file_name_juris <- paste0("snohomish_unit_estimates_juris_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+file_name_tract <- paste0("snohomish_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 
-# Creates final excel spreadsheets 
-write_xlsx(total_net_summary,file.path(output_dir,"totals.xlsx"))
-write_xlsx(city_net_summary,file.path(output_dir,"city.xlsx"))
-write_xlsx(tract_net_summary,file.path(output_dir,"tract.xlsx"))
+write_xlsx(x = total_net_summary, path = paste0(output_dir, file_name_county))
+write_xlsx(x = split(city_net_summary, city_net_summary$yrbuilt) %>% map(., ~ (.x %>% select(-yrbuilt))),
+           path = paste0(output_dir, file_name_juris))
+write_xlsx(x = split(tract_net_summary, tract_net_summary$yrbuilt) %>% map(., ~ (.x %>% select(-yrbuilt))),
+           path = paste0(output_dir, file_name_tract))
+
+# save tables to .rda for combining script
+save(snohomish_parcel_tbl, snohomish_county_units_long, snohomish_juris_units_long, snohomish_tract_units_long,
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/snohomish_tables.rda")
