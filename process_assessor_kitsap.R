@@ -295,11 +295,11 @@ current_base_join$development[current_base_join$RP_ACCT_ID %in% c("2453934", "24
 ####
 
 # Compute new units & demo units
-current_base_join$new_units <- if_else(current_base_join$development %in% c("new development", "redevelopment"),
+current_base_join$new_units <- if_else(current_base_join$development %in% c("new development", "redevelopment", "rebuild or remodel"),
                                        current_base_join$units, 0)
 
 demos <- current_base_join %>% 
-  filter(development == "redevelopment") %>% 
+  filter(development %in% c("redevelopment", "rebuild or remodel")) %>% 
   distinct(base_rid, .keep_all = TRUE) %>% 
   mutate(demo_units = base_units * -1)
 

@@ -434,10 +434,6 @@ current_base_join <- current_base_join %>%
                                  | (year_built > base_year_built & base_pin_count > 1) ~ "redevelopment")
   )
 
-# Compute new units, demo units
-current_base_join$new_units <- if_else(current_base_join$development %in% c("new development", "redevelopment"),
-                                       current_base_join$units, 0)
-
 #### UNIQUE TO THIS DATA!
 current_base_join$development[current_base_join$current_prcl %in% c("6025250981", "2017130042", "7001880160",
                                                                     "4002890018", "4002890022", "4002890023",
@@ -448,8 +444,12 @@ current_base_join$development[current_base_join$current_prcl %in% c("6025250981"
 current_base_join$development[current_base_join$current_prcl %in% c("3905000023")] <- "rebuild or remodel"
 ####
 
+# Compute new units, demo units
+current_base_join$new_units <- if_else(current_base_join$development %in% c("new development", "redevelopment", "rebuild or remodel"),
+                                       current_base_join$units, 0)
+
 demos <- current_base_join %>% 
-  filter(development == "redevelopment") %>% 
+  filter(development %in% c("redevelopment", "rebuild or remodel")) %>% 
   distinct(base_prcl, .keep_all = TRUE) %>% 
   mutate(demo_units = base_units * -1)
 
