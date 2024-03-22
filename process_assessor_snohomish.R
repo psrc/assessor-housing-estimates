@@ -253,7 +253,7 @@ new_unit_parcel_records <- current_base_join_final %>%
   select(project_year,
          pin,
          year = yrbuilt,
-         units,
+         units = new_units,
          buildings,
          structure_type,
          development,
