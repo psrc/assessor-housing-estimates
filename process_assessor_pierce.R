@@ -96,7 +96,7 @@ base_appraisal <- read_csv(paste0(base_file_path, base_appraisal_file_name),
 # This is created using the parcel preprocessing python script
 parcels_current_base <- st_read(paste0(current_shapefile_path, current_base_shapefile_name),
                              crs = 2285, stringsAsFactors = FALSE) %>% 
-  rename(current_prcl = taxparceln) %>% 
+  rename(current_prcl = TaxParcelN) %>% 
   mutate(juris = ifelse(juris == "Dupont", "DuPont", juris))
 
 # Read in base year condo parcel shapefile with base parcel PINs
@@ -130,25 +130,44 @@ current_year$units[current_year$built_as_id %in% c(71, 75, 77, 78) & current_yea
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 # Delete rows from current table with non-unit buildings (i.e. apartment offices)
+# View(filter(current_year, units == 0 & buildings == 0))
+# View(filter(current_year, units == 0 & buildings > 0))
 current_year <- current_year[!(current_year$parcel_number == "220132086" & current_year$building_id == 8), ]
 current_year$buildings[current_year$parcel_number == "220132086"] <- 7
 
 current_year <- current_year[!(current_year$parcel_number == "219123117" & current_year$building_id == 4), ]
 current_year$buildings[current_year$parcel_number == "219123117"] <- 3
 
+current_year <- current_year[!(current_year$parcel_number == "6021961470" & current_year$building_id == 13), ]
+current_year$buildings[current_year$parcel_number == "6021961470"] <- 15
+
+current_year <- current_year[!(current_year$parcel_number == "5270001611" & current_year$building_id == 3), ]
+current_year$buildings[current_year$parcel_number == "5270001611"] <- 19
+
 current_year <- current_year[!(current_year$parcel_number == "220142041" & current_year$units == 0), ]
-current_year <- current_year[!(current_year$parcel_number == "8950003316" & current_year$units == 0), ]
+# current_year <- current_year[!(current_year$parcel_number == "8950003316" & current_year$units == 0), ]
 current_year <- current_year[!(current_year$parcel_number == "9010740030" & current_year$units == 0), ]
 
+# Non-residential structure
 current_year <- current_year[!(current_year$parcel_number == "2078140051"), ]
+current_year <- current_year[!(current_year$parcel_number == "6565000030" & current_year$building_id == 2), ]
 
-# Delete rows from current table with 0 units (oddball)
+# Delete rows from current table with 0 units (oddball) or structure is incomplete
 current_year <- current_year[!(current_year$parcel_number == "420346013"), ]
 current_year <- current_year[!(current_year$parcel_number == "420346014"), ]
-current_year <- current_year[!(current_year$parcel_number == "7850000720"), ]
+# current_year <- current_year[!(current_year$parcel_number == "7850000720"), ]
+current_year <- current_year[!(current_year$parcel_number == "2011230010"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990010"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990020"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990030"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990040"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990050"), ]
 
 # Fix null unit counts
 current_year$units[is.na(current_year$units)] <- 1
+
+# Fix wrong unit counts
+current_year$units[current_year$parcel_number == "7850000721"] <- 4
 ####
 
 # Assign structure type based on built_as_id
@@ -400,13 +419,29 @@ current_base_join <- left_join(current_year_join, base_year_join,
 current_base_join <- current_base_join[!is.na(current_base_join$current_prcl), ]
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
+# Manually reassign structure type
 current_base_join$str_type[current_base_join$current_prcl %in% c("0022272011", "0416104046", "0417084029",
-                                                                 "0417173702", "0022251008", "5017101160")] <- "single family detached"
-current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034", "0221068038")] <- "single family attached"
+                                                                 "0417173702", "0022251008", "5017101160",
+                                                                 "0316062043")] <- "single family detached"
+
+current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034",
+                                                                 "0221068038", "2019220081", "2019220082",
+                                                                 "2019220083", "2019220086", "2019220087",
+                                                                 "2019220088")] <- "single family attached"
+
 current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "mobile homes"
 
 current_base_join$base_str_type[current_base_join$current_prcl == "4005000254"] <- "single family detached"
 current_base_join$base_str_type[current_base_join$current_prcl == "2485400430"] <- "mobile homes"
+
+# Assign juris and tract to records with null values
+current_base_join$juris[current_base_join$current_prcl == "0520252021"] <- "Unincorporated Pierce"
+current_base_join$tractid[current_base_join$current_prcl == "0520252021"] <- "53053070307"
+current_base_join$tract20[current_base_join$current_prcl == "0520252021"] <- "703.07"
+
+current_base_join$juris[current_base_join$current_prcl == "6025250981"] <- "Unincorporated Pierce"
+current_base_join$tractid[current_base_join$current_prcl == "6025250981"] <- "53053071304"
+current_base_join$tract20[current_base_join$current_prcl == "6025250981"] <- "713.04"
 ####
 
 # Specify development type and demolition
@@ -430,7 +465,8 @@ current_base_join$development[current_base_join$current_prcl %in% c("6025250981"
                                                                     "4002890018", "4002890022", "4002890023",
                                                                     "4002890026", "4002890028", "4002890029",
                                                                     "4002890031", "4002890034", "2038190080",
-                                                                    "5340000080", "2200002541", "3873000080")] <- "new development"
+                                                                    "5340000080", "2200002541", "3873000080",
+                                                                    "7850000721")] <- "new development"
 
 current_base_join$development[current_base_join$current_prcl %in% c("3905000023")] <- "rebuild or remodel"
 ####
