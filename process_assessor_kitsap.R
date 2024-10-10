@@ -36,12 +36,9 @@ juris <- get_query(sql = juris_query, db_name = "ElmerGeo") %>%
   mutate(juris = ifelse(feat_type %in% c("uninc", "rural"), "Unincorporated Kitsap", juris)) %>% 
   select(-feat_type) %>% 
   distinct() %>% 
-  arrange()
+  arrange(juris)
 
 tracts <- get_query(sql = tract_query, db_name = "ElmerGeo")
-
-dbDisconnect(geo_conn)
-rm(geo_conn)
 
 current_year <- st_read(paste0(current_file_path, current_file_name),
                         crs = 2285, stringsAsFactors = FALSE) %>% 
@@ -132,10 +129,15 @@ current_year_sum$buildings[current_year_sum$RP_ACCT_ID == "2414415"] <- 7
 current_year_sum$house_type[current_year_sum$RP_ACCT_ID == "2414415"] <- NA
 
 # delete records with 0 units (unfinished construction)
+# View(filter(current_year_sum, units == 0))
 current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "1490747"), ]
 current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2647287"), ]
 current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2680080"), ]
 current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2687820"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2660363"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2665792"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2685980"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2687838"), ]
 ####
 
 current_year_sum$units_per_bldg <- round(current_year_sum$units / current_year_sum$buildings, 0)
@@ -167,35 +169,47 @@ current_year_sum <- left_join(current_year_sum, parcels_current_base, by = c("RP
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 # parcel centroids didn't match to other polygons in ArcMap processing
-current_year_sum$juris[is.na(current_year_sum$juris)] <- "Unincorporated Kitsap"
+# View(filter(current_year_sum, is.na(juris)))
+# current_year_sum$juris[is.na(current_year_sum$juris)] <- "Unincorporated Kitsap"
 
-current_year_sum$tractid[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
-                                                            "2693406", "2693414", "2693448", "2693463")] <- "53035090102"
-current_year_sum$tract20[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
-                                                            "2693406", "2693414", "2693448", "2693463")] <- "901.02"
+# View(filter(current_year_sum, is.na(tractid)))
+# View(filter(current_year_sum, is.na(tract20)))
+# current_year_sum$tractid[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
+#                                                             "2693406", "2693414", "2693448", "2693463")] <- "53035090102"
+# current_year_sum$tract20[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
+#                                                             "2693406", "2693414", "2693448", "2693463")] <- "901.02"
+# 
+# current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2691178"] <- "53035092701"
+# current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2691178"] <- "927.01"
 
-current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2691178"] <- "53035092701"
-current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2691178"] <- "927.01"
-
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2691137"] <- 1227859
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2691178"] <- 1209310
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2692077"] <- 1228922
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693067"] <- 1226249
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693075"] <- 1226248
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693406"] <- 1226128
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693414"] <- 1226112
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693448"] <- 1226063
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693463"] <- 1226051
-
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2691137"] <- 319380
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2691178"] <- 178877
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2692077"] <- 287443
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693067"] <- 286994
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693075"] <- 286944
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693406"] <- 288160
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693414"] <- 288113
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693448"] <- 287961
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693463"] <- 287861
+# View(filter(current_year_sum, is.na(x_coord)))
+# View(filter(current_year_sum, is.na(y_coord)))
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2691137"] <- 1227859
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2691137"] <- 319380
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2691178"] <- 1209310
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2691178"] <- 178877
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2692077"] <- 1228922
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2692077"] <- 287443
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693067"] <- 1226249
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693067"] <- 286994
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693075"] <- 1226248
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693075"] <- 286944
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693406"] <- 1226128
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693406"] <- 288160
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693414"] <- 1226112
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693414"] <- 288113
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693448"] <- 1226063
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693448"] <- 287961
+# 
+# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693463"] <- 1226051
+# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693463"] <- 287861
 ####
 
 rm(current_year, parcels_current_base)
