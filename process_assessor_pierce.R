@@ -434,11 +434,15 @@ current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "m
 current_base_join$base_str_type[current_base_join$current_prcl == "4005000254"] <- "single family detached"
 current_base_join$base_str_type[current_base_join$current_prcl == "2485400430"] <- "mobile homes"
 
-# Assign juris and tract to records with null values
+# Assign x-y, juris, and tract to records with null values
+current_base_join$x_coord[current_base_join$current_prcl == "0520252021"] <- 1320172
+current_base_join$y_coord[current_base_join$current_prcl == "0520252021"] <- 73745
 current_base_join$juris[current_base_join$current_prcl == "0520252021"] <- "Unincorporated Pierce"
 current_base_join$tractid[current_base_join$current_prcl == "0520252021"] <- "53053070307"
 current_base_join$tract20[current_base_join$current_prcl == "0520252021"] <- "703.07"
 
+current_base_join$x_coord[current_base_join$current_prcl == "6025250981"] <- 1275309
+current_base_join$y_coord[current_base_join$current_prcl == "6025250981"] <- 52767
 current_base_join$juris[current_base_join$current_prcl == "6025250981"] <- "Unincorporated Pierce"
 current_base_join$tractid[current_base_join$current_prcl == "6025250981"] <- "53053071304"
 current_base_join$tract20[current_base_join$current_prcl == "6025250981"] <- "713.04"
