@@ -5,9 +5,9 @@ library(sf)
 
 # Read in county tables -----------------------------------------------------------------------
 
-input_path <- "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/"
-output_path <- "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/GIS/"
-project_year <- 2023
+input_path <- "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/"
+output_path <- "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/GIS/"
+project_year <- 2024
 
 setwd(input_path)
 
@@ -38,7 +38,7 @@ region_parcels_sf <- region_parcels %>%
   mutate(psrc_id = sprintf(paste0(project_year, "P", "%06d"), rows_p), .before = 1) %>% 
   st_as_sf(., coords = c("x_coord", "y_coord"), crs = 2285, remove = FALSE)
 
-st_write(region_parcels_sf, dsn = paste0(output_path, "psrc_assessor_housing_estimates_2023.shp"),
+st_write(region_parcels_sf, dsn = paste0(output_path, "psrc_assessor_housing_estimates_2024.shp"),
          delete_layer = TRUE)
 
 

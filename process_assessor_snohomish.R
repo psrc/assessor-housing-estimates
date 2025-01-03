@@ -7,9 +7,9 @@ library(data.table)
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
   
 # Data directories
-data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2023"
+data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2024"
 input_dir <- file.path(data_dir, "script_inputs")
-output_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2023/script_outputs/"
+output_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2024/script_outputs/"
 
 # file names
 current_base_join_file_name <- "current_base_join_gis_output.csv"
@@ -115,7 +115,7 @@ current_base_join$units_10[current_base_join$demolition!=1] <- 0
 current_base_join_final <- current_base_join %>%
   filter(is.na(mobile_home_park)) %>%
   filter(is.na(mobile_home_park_10)) %>%
-  filter(yrbuilt %in% c(2011:2022)) %>%
+  filter(yrbuilt %in% c(2011:2023)) %>%
   rename('juris' = 'jurisdiction')
 
 # Creates a demolitions table that removes the duplication found in the joined current-base table
@@ -126,8 +126,8 @@ demos <- current_base_join_final %>%
 
 # Removes mobile home park closure records so they only show up in the demos table
 current_base_join_final <- current_base_join_final %>%
-  filter(mobile_home_park_closure != 1)
-  
+  filter(is.na(mobile_home_park_closure))
+
 ## Creates functions to summarize the net change estimates by county total, jurisdiction, and census tract
 
 # These functions format the final tables and any missing cities/tracts that don't have data
@@ -246,7 +246,7 @@ tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yr
 
 # Creates final parcel table
 new_unit_parcel_records <- current_base_join_final %>%
-  mutate(project_year = 2023) %>%
+  mutate(project_year = 2024) %>%
   mutate(county = "Snohomish") %>%
   mutate(county_fips = "061") %>%
   mutate(pin=NA) %>%
@@ -265,7 +265,7 @@ new_unit_parcel_records <- current_base_join_final %>%
          y_coord = y)
 
 lost_unit_parcel_records <- demos %>%
-  mutate(project_year = 2023) %>%
+  mutate(project_year = 2024) %>%
   mutate(county = "Snohomish") %>%
   mutate(county_fips = "061") %>%
   mutate(pin=NA) %>%
@@ -290,7 +290,7 @@ snohomish_county_units_long <- total_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023, 
+  mutate(project_year = 2024, 
          county = "Snohomish") %>% 
   select(project_year, county, year = yrbuilt, structure_type, net_units)
 
@@ -298,7 +298,7 @@ snohomish_juris_units_long <- city_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023, 
+  mutate(project_year = 2024, 
          county = "Snohomish") %>% 
   select(project_year, county, juris, year = yrbuilt, structure_type, net_units)
 
@@ -306,7 +306,7 @@ snohomish_tract_units_long <- tract_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023, 
+  mutate(project_year = 2024, 
          county = "Snohomish") %>% 
   select(project_year, county, tract = geoid20, year = yrbuilt, structure_type, net_units)
 
@@ -324,4 +324,4 @@ write_xlsx(x = split(tract_net_summary, tract_net_summary$yrbuilt) %>% map(., ~ 
 
 # save tables to .rda for combining script
 save(snohomish_parcel_tbl, snohomish_county_units_long, snohomish_juris_units_long, snohomish_tract_units_long,
-     file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/snohomish_tables.rda")
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/snohomish_tables.rda")
