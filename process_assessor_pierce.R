@@ -4,19 +4,12 @@ library(writexl)
 library(odbc)
 library(DBI)
 library(sf)
+library(psrcelmer)
 
 # Define file paths and other variables -------------------------------------------------------
 
-# ElmerGeo db connection
-geo_conn <- dbConnect(odbc::odbc(),
-                      driver = "ODBC Driver 17 for SQL Server",
-                      server = "AWS-PROD-SQL\\Sockeye",
-                      database = "ElmerGeo",
-                      trusted_connection = "yes"
-)
-
 # source data file paths
-current_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2023/extracts/current/"
+current_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2024/extracts/"
 current_appraisal_file_name <- "appraisal_account.txt"
 current_improvement_file_name <- "improvement.txt"
 current_builtas_file_name <- "improvement_builtas.txt"
@@ -26,34 +19,32 @@ base_appraisal_file_name <- "appraisal_account_2012.csv"
 base_improvement_file_name <- "improvement_2012.csv"
 base_builtas_file_name <- "improvement_builtas_2012.csv"
 
-current_shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2023/GIS/"
-current_base_shapefile_name <- "parcels_2023_2012_region22_tract20.shp"
+current_shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2024/GIS/"
+current_base_shapefile_name <- "parcels_2024_2012_region23_tract20.shp"
 
 base_shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/base_year/GIS/"
 condo_base_shapefile_name <- "pierce_condos_2012.shp"
 
-juris_query <- "SELECT juris, feat_type FROM ElmerGeo.dbo.PSRC_REGION WHERE cnty_name = 'Pierce' AND feat_type <> 'water'"
+juris_query <- "SELECT juris, feat_type FROM dbo.PSRC_REGION WHERE cnty_name = 'Pierce' AND feat_type <> 'water'"
 
-tract_query <- "SELECT geoid20 FROM ElmerGeo.dbo.TRACT2020 WHERE county_name = 'Pierce'"
+tract_query <- "SELECT geoid20 FROM dbo.TRACT2020 WHERE county_name = 'Pierce'"
 
-output_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2023/script_outputs/"
+output_file_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/2024/script_outputs/"
 
 year_start <- 2012
-year_end <- 2022
+year_end <- 2023
+proj_year <- 2024
 
 
 # Load data from source -----------------------------------------------------------------------
 
-juris <- dbGetQuery(geo_conn, juris_query) %>% 
+juris <- get_query(sql = juris_query, db_name = "ElmerGeo") %>% 
   mutate(juris = ifelse(feat_type %in% c("uninc", "rural"), "Unincorporated Pierce", juris)) %>% 
   select(-feat_type) %>% 
   distinct() %>% 
-  arrange()
+  arrange(juris)
 
-tracts <- dbGetQuery(geo_conn, tract_query)
-
-dbDisconnect(geo_conn)
-rm(geo_conn)
+tracts <- get_query(sql = tract_query, db_name = "ElmerGeo")
 
 current_improvement <- read_delim(paste0(current_file_path, current_improvement_file_name),
                                   delim = "|",
@@ -101,15 +92,15 @@ base_appraisal <- read_csv(paste0(base_file_path, base_appraisal_file_name),
                              parcel_number = col_character()
                            ))
 
-# Read in current year base parcel shapefile with 2012 PINs
-# This is created in ArcMap prior to R processing, using psrc_region layer
+# Read in current year base parcel shapefile with base parcel PINs
+# This is created using the parcel preprocessing python script
 parcels_current_base <- st_read(paste0(current_shapefile_path, current_base_shapefile_name),
                              crs = 2285, stringsAsFactors = FALSE) %>% 
-  rename(current_prcl = taxparceln) %>% 
+  rename(current_prcl = TaxParcelN) %>% 
   mutate(juris = ifelse(juris == "Dupont", "DuPont", juris))
 
 # Read in base year condo parcel shapefile with base parcel PINs
-# This is created in ArcMap prior to R processing
+# This was created in ArcMap prior to R processing
 condo_parcels_base <- st_read(paste0(base_shapefile_path, condo_base_shapefile_name),
                               crs = 2285, stringsAsFactors = FALSE)
 
@@ -139,25 +130,44 @@ current_year$units[current_year$built_as_id %in% c(71, 75, 77, 78) & current_yea
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 # Delete rows from current table with non-unit buildings (i.e. apartment offices)
+# View(filter(current_year, units == 0 & buildings == 0))
+# View(filter(current_year, units == 0 & buildings > 0))
 current_year <- current_year[!(current_year$parcel_number == "220132086" & current_year$building_id == 8), ]
 current_year$buildings[current_year$parcel_number == "220132086"] <- 7
 
 current_year <- current_year[!(current_year$parcel_number == "219123117" & current_year$building_id == 4), ]
 current_year$buildings[current_year$parcel_number == "219123117"] <- 3
 
+current_year <- current_year[!(current_year$parcel_number == "6021961470" & current_year$building_id == 13), ]
+current_year$buildings[current_year$parcel_number == "6021961470"] <- 15
+
+current_year <- current_year[!(current_year$parcel_number == "5270001611" & current_year$building_id == 3), ]
+current_year$buildings[current_year$parcel_number == "5270001611"] <- 19
+
 current_year <- current_year[!(current_year$parcel_number == "220142041" & current_year$units == 0), ]
-current_year <- current_year[!(current_year$parcel_number == "8950003316" & current_year$units == 0), ]
+# current_year <- current_year[!(current_year$parcel_number == "8950003316" & current_year$units == 0), ]
 current_year <- current_year[!(current_year$parcel_number == "9010740030" & current_year$units == 0), ]
 
+# Non-residential structure
 current_year <- current_year[!(current_year$parcel_number == "2078140051"), ]
+current_year <- current_year[!(current_year$parcel_number == "6565000030" & current_year$building_id == 2), ]
 
-# Delete rows from current table with 0 units (oddball)
+# Delete rows from current table with 0 units (oddball) or structure is incomplete
 current_year <- current_year[!(current_year$parcel_number == "420346013"), ]
 current_year <- current_year[!(current_year$parcel_number == "420346014"), ]
-current_year <- current_year[!(current_year$parcel_number == "7850000720"), ]
+# current_year <- current_year[!(current_year$parcel_number == "7850000720"), ]
+current_year <- current_year[!(current_year$parcel_number == "2011230010"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990010"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990020"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990030"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990040"), ]
+current_year <- current_year[!(current_year$parcel_number == "9010990050"), ]
 
 # Fix null unit counts
 current_year$units[is.na(current_year$units)] <- 1
+
+# Fix wrong unit counts
+current_year$units[current_year$parcel_number == "7850000721"] <- 4
 ####
 
 # Assign structure type based on built_as_id
@@ -409,13 +419,33 @@ current_base_join <- left_join(current_year_join, base_year_join,
 current_base_join <- current_base_join[!is.na(current_base_join$current_prcl), ]
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
+# Manually reassign structure type
 current_base_join$str_type[current_base_join$current_prcl %in% c("0022272011", "0416104046", "0417084029",
-                                                                 "0417173702", "0022251008", "5017101160")] <- "single family detached"
-current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034", "0221068038")] <- "single family attached"
+                                                                 "0417173702", "0022251008", "5017101160",
+                                                                 "0316062043")] <- "single family detached"
+
+current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034",
+                                                                 "0221068038", "2019220081", "2019220082",
+                                                                 "2019220083", "2019220086", "2019220087",
+                                                                 "2019220088")] <- "single family attached"
+
 current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "mobile homes"
 
 current_base_join$base_str_type[current_base_join$current_prcl == "4005000254"] <- "single family detached"
 current_base_join$base_str_type[current_base_join$current_prcl == "2485400430"] <- "mobile homes"
+
+# Assign x-y, juris, and tract to records with null values
+current_base_join$x_coord[current_base_join$current_prcl == "0520252021"] <- 1320172
+current_base_join$y_coord[current_base_join$current_prcl == "0520252021"] <- 73745
+current_base_join$juris[current_base_join$current_prcl == "0520252021"] <- "Unincorporated Pierce"
+current_base_join$tractid[current_base_join$current_prcl == "0520252021"] <- "53053070307"
+current_base_join$tract20[current_base_join$current_prcl == "0520252021"] <- "703.07"
+
+current_base_join$x_coord[current_base_join$current_prcl == "6025250981"] <- 1275309
+current_base_join$y_coord[current_base_join$current_prcl == "6025250981"] <- 52767
+current_base_join$juris[current_base_join$current_prcl == "6025250981"] <- "Unincorporated Pierce"
+current_base_join$tractid[current_base_join$current_prcl == "6025250981"] <- "53053071304"
+current_base_join$tract20[current_base_join$current_prcl == "6025250981"] <- "713.04"
 ####
 
 # Specify development type and demolition
@@ -439,7 +469,8 @@ current_base_join$development[current_base_join$current_prcl %in% c("6025250981"
                                                                     "4002890018", "4002890022", "4002890023",
                                                                     "4002890026", "4002890028", "4002890029",
                                                                     "4002890031", "4002890034", "2038190080",
-                                                                    "5340000080", "2200002541", "3873000080")] <- "new development"
+                                                                    "5340000080", "2200002541", "3873000080",
+                                                                    "7850000721")] <- "new development"
 
 current_base_join$development[current_base_join$current_prcl %in% c("3905000023")] <- "rebuild or remodel"
 ####
@@ -592,7 +623,7 @@ write_xlsx(x = split(tract_units, tract_units$year_built) %>% map(., ~ (.x %>% s
 # Create output for combined region process ---------------------------------------------------
 # parcel table for shapefile
 parcel_new <- current_base_join %>% 
-  mutate(project_year = 2023,
+  mutate(project_year = proj_year,
          county = "Pierce",
          county_fips = "053") %>% 
   select(project_year,
@@ -611,7 +642,7 @@ parcel_new <- current_base_join %>%
 
 parcel_demo <- demos %>% 
   filter(demo_units != 0) %>% 
-  mutate(project_year = 2023,
+  mutate(project_year = proj_year,
          county = "Pierce",
          county_fips = "053",
          development = "demolition") %>% 
@@ -636,7 +667,7 @@ pierce_county_units_long <- county_units %>%
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023, 
+  mutate(project_year = proj_year, 
          county = "Pierce") %>% 
   select(project_year, county, year = year_built, structure_type, net_units)
 
@@ -644,7 +675,7 @@ pierce_juris_units_long <- juris_units %>%
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023, 
+  mutate(project_year = proj_year, 
          county = "Pierce") %>% 
   select(project_year, county, juris, year = year_built, structure_type, net_units)
 
@@ -652,10 +683,10 @@ pierce_tract_units_long <- tract_units %>%
   pivot_longer(cols = net_total:`mobile homes`,
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2023, 
+  mutate(project_year = proj_year, 
          county = "Pierce") %>% 
   select(project_year, county, tract = tractid, year = year_built, structure_type, net_units)
 
 # save tables to .rda for combining script
 save(pierce_parcel_tbl, pierce_county_units_long, pierce_juris_units_long, pierce_tract_units_long,
-     file = "J:/Projects/Assessor/assessor_permit/data_products/2023/elmer/pierce_tables.rda")
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/pierce_tables.rda")

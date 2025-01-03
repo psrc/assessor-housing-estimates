@@ -48,23 +48,27 @@ st_write(region_parcels_sf, dsn = paste0(output_path, "psrc_assessor_housing_est
 region_county <- bind_rows(king_county_units_long,
                            kitsap_county_units_long,
                            pierce_county_units_long,
-                           snohomish_county_units_long)
-
-
+                           snohomish_county_units_long) %>% 
+  mutate(project_year = as.character(project_year),
+         year = as.character(year))
 
 # juris
 region_juris <- bind_rows(king_juris_units_long,
                           kitsap_juris_units_long,
                           pierce_juris_units_long,
-                          snohomish_juris_units_long)
-
-
+                          snohomish_juris_units_long) %>% 
+  mutate(project_year = as.character(project_year),
+         year = as.character(year))
 
 # tract
 region_tract <- bind_rows(king_tract_units_long,
                           kitsap_tract_units_long,
                           pierce_tract_units_long,
-                          snohomish_tract_units_long)
+                          snohomish_tract_units_long) %>% 
+  mutate(project_year = as.character(project_year),
+         year = as.character(year))
 
-
-
+# Write tables to 'stg' schema
+psrcelmer::stage_table(region_county, table_name = "assessor_net_housing_county")
+psrcelmer::stage_table(region_juris, table_name = "assessor_net_housing_juris")
+psrcelmer::stage_table(region_tract, table_name = "assessor_net_housing_tract")
