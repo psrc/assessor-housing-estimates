@@ -1,0 +1,12 @@
+extract_path: J:/Projects/Assessor/extracts/2025/July_25
+project_path: J:/Projects/Assessor/assessor_permit
+juris_path: /gis/cities/cities_2024.shp
+crs: 2285
+
+kitsap_base_path: /kitsap/data/base_year/GIS/parcels_2009.shp
+kitsap_current_path: /Kitsap/Tax_Parcel_lot_polygons_-8300561185788163279/b99a8f37-6623-4bea-a5db-fd44b88a9180.gdb
+kitsap_output_path: /kitsap/data/2025/GIS/parcels_2025_2010_region24_tract20.shp
+
+pierce_base_path: /pierce/data/base_year/GIS/pierce_parcels_2012.shp
+pierce_current_path: /Pierce/Parcels/tax_parcels.shp
+pierce_output_path: /pierce/data/2025/GIS/parcels_2025_2012_region24_tract20.shp
