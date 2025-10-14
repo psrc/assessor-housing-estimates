@@ -61,13 +61,10 @@ def process_kitsap_parcels(config, juris, tracts):
     current_base_join = current_base_join.sjoin(tracts, how='left')
     current_base_join.drop(columns='index_right', inplace=True)
     
-    # join current points back to polygons
-    current_base_df = pd.DataFrame(current_base_join.drop(columns='geometry'))
-    
-    current_base_gdf = pd.merge(current_gdf, current_base_df,
-                                left_on='RP_ACCT_ID', right_on='RP_ACCT_ID',
-                                how='left')
-    
+    # spatial join current points back to polygons (due to zeros in RP_ACCT_ID)
+    current_base_gdf = current_gdf.sjoin(current_base_join, how='left', predicate='contains')
+    current_base_gdf.drop(columns=['index_right', 'RP_ACCT_ID_right'], inplace=True)
+    current_base_gdf.rename({'RP_ACCT_ID_left': 'RP_ACCT_ID'}, axis=1, inplace=True)
     current_base_gdf = current_base_gdf[field_list]
     
     return(current_base_gdf)
