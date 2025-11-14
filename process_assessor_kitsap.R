@@ -8,26 +8,26 @@ library(psrcelmer)
 
 # Define file paths and other variables -------------------------------------------------------
 
+year_start <- 2010
+year_end <- 2024
+proj_year <- 2025
+
 # source data file paths
-current_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/2024/extracts/"
-current_file_name <- "KITSAP_COUNTY_PARCELS_09182024.shp"
+current_file_path <- str_glue("J:/Projects/Assessor/assessor_permit/kitsap/data/{proj_year}/extracts/")
+current_file_name <- "KITSAP_COUNTY_PARCELS_09302025.shp"
 
 base_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/base_year/extracts/"
 base_file_name <- "Kitsap_Housing_2011.xlsx"
 base_improvements_name <- "improvements.csv"
 
-current_base_shapefile_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/2024/GIS/"
-current_base_shapefile_name <- "parcels_2024_2010_region23_tract20.shp"
+current_base_shapefile_path <- str_glue("J:/Projects/Assessor/assessor_permit/kitsap/data/{proj_year}/GIS/")
+current_base_shapefile_name <- "parcels_2025_2010_region24_tract20.shp"
 
 juris_query <- "SELECT juris, feat_type FROM dbo.PSRC_REGION WHERE cnty_name = 'Kitsap' AND feat_type <> 'water'"
 
 tract_query <- "SELECT geoid20 FROM dbo.TRACT2020 WHERE county_name = 'Kitsap'"
 
-output_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/2024/script_outputs/"
-
-year_start <- 2010
-year_end <- 2023
-proj_year <- 2024
+output_file_path <- str_glue("J:/Projects/Assessor/assessor_permit/kitsap/data/{proj_year}/script_outputs/")
 
 
 # Load data from source -----------------------------------------------------------------------
@@ -71,8 +71,8 @@ parcels_current_base <- st_read(paste0(current_base_shapefile_path, current_base
   rename(current_rid = RP_ACCT_ID) %>% 
   distinct()
 
-# Read in dwellings table from July 2024 extract and filter for townhouse designation
-townhouses <- read_delim("J:/Projects/Assessor/extracts/2024/July_24/Kitsap/Dwellings.txt",
+# Read in dwellings table from July 2025 extract and filter for townhouse designation
+townhouses <- read_delim("J:/Projects/Assessor/extracts/2025/July_25/Kitsap/Dwellings.txt",
                          delim = "\t",
                          col_types = cols(
                            rp_acct_id = col_character()
@@ -131,13 +131,9 @@ current_year_sum$house_type[current_year_sum$RP_ACCT_ID == "2414415"] <- NA
 # delete records with 0 units (unfinished construction)
 # View(filter(current_year_sum, units == 0))
 current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "1490747"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2647287"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2680080"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2687820"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2660363"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2665792"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2685980"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "1508183"), ]
 current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2687838"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2694859"), ]
 ####
 
 current_year_sum$units_per_bldg <- round(current_year_sum$units / current_year_sum$buildings, 0)
@@ -170,46 +166,17 @@ current_year_sum <- left_join(current_year_sum, parcels_current_base, by = c("RP
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
 # parcel centroids didn't match to other polygons in ArcMap processing
 # View(filter(current_year_sum, is.na(juris)))
-# current_year_sum$juris[is.na(current_year_sum$juris)] <- "Unincorporated Kitsap"
+current_year_sum$juris[current_year_sum$RP_ACCT_ID == "2717072"] <- "Unincorporated Kitsap"
 
 # View(filter(current_year_sum, is.na(tractid)))
 # View(filter(current_year_sum, is.na(tract20)))
-# current_year_sum$tractid[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
-#                                                             "2693406", "2693414", "2693448", "2693463")] <- "53035090102"
-# current_year_sum$tract20[current_year_sum$RP_ACCT_ID %in% c("2691137", "2692077", "2693067", "2693075",
-#                                                             "2693406", "2693414", "2693448", "2693463")] <- "901.02"
-# 
-# current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2691178"] <- "53035092701"
-# current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2691178"] <- "927.01"
+current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2717072"] <- "53035090102"
+current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2717072"] <- "901.02"
 
 # View(filter(current_year_sum, is.na(x_coord)))
 # View(filter(current_year_sum, is.na(y_coord)))
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2691137"] <- 1227859
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2691137"] <- 319380
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2691178"] <- 1209310
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2691178"] <- 178877
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2692077"] <- 1228922
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2692077"] <- 287443
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693067"] <- 1226249
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693067"] <- 286994
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693075"] <- 1226248
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693075"] <- 286944
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693406"] <- 1226128
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693406"] <- 288160
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693414"] <- 1226112
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693414"] <- 288113
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693448"] <- 1226063
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693448"] <- 287961
-# 
-# current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2693463"] <- 1226051
-# current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2693463"] <- 287861
+current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2717072"] <- 1226133
+current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2717072"] <- 304118
 ####
 
 rm(current_year, parcels_current_base)
@@ -470,7 +437,7 @@ write_xlsx(x = split(tract_units, tract_units$year_built) %>% map(., ~ (.x %>% s
            path = paste0(output_file_path, file_name_tract))
 
 
-# Create outputs for combined region processing -----------------------------------------------
+# Create outputs for combined region processing - AFTER REVIEW --------------------------------
 # parcel table for shapefile
 parcel_new <- current_base_join %>% 
   mutate(project_year = proj_year,
@@ -539,4 +506,4 @@ kitsap_tract_units_long <- tract_units %>%
 
 # save tables to .rda for combining script
 save(kitsap_parcel_tbl, kitsap_county_units_long, kitsap_juris_units_long, kitsap_tract_units_long,
-     file = "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/kitsap_tables.rda")
+     file = str_glue("J:/Projects/Assessor/assessor_permit/data_products/{proj_year}/elmer/kitsap_tables.rda"))
