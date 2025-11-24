@@ -449,6 +449,10 @@ current_base_join$base_str_type[current_base_join$current_prcl == "2260000421"] 
 # current_base_join$juris[current_base_join$current_prcl == "6025250981"] <- "Unincorporated Pierce"
 # current_base_join$tractid[current_base_join$current_prcl == "6025250981"] <- "53053071304"
 # current_base_join$tract20[current_base_join$current_prcl == "6025250981"] <- "713.04"
+
+# Reassign tract ID
+current_base_join$tractid[current_base_join$current_prcl == "5004810210"] <- "53053940005"
+current_base_join$tract20[current_base_join$current_prcl == "5004810210"] <- "9400.05"
 ####
 
 # Specify development type and demolition
