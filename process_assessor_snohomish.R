@@ -7,9 +7,9 @@ library(data.table)
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
   
 # Data directories
-data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2024"
+data_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2025"
 input_dir <- file.path(data_dir, "script_inputs")
-output_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2024/script_outputs/"
+output_dir <- "J:/Projects/Assessor/assessor_permit/snohomish/data/2025/script_outputs/"
 
 # file names
 current_base_join_file_name <- "current_base_join_gis_output.csv"
@@ -31,14 +31,14 @@ current_base_join$units_10 <- as.numeric(as.character(current_base_join$units_10
 current_base_join$units[is.na(current_base_join$units)] <- 0
 current_base_join$units[current_base_join$usedesc == "Duplex"] <- current_base_join$frequency[current_base_join$usedesc == "Duplex"] * 2
 current_base_join$units[current_base_join$usedesc == "Triplex"] <- current_base_join$frequency[current_base_join$usedesc == "Triplex"] * 3
-current_base_join$units[!(current_base_join$usedesc %in% c("Apartment, High Rise, Shell", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] <- current_base_join$frequency[!(current_base_join$usedesc %in% c("Apartment, High Rise, Shell", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] * 1
+current_base_join$units[!(current_base_join$usedesc %in% c("Apartment, High Rise, Shell","Other residential", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] <- current_base_join$frequency[!(current_base_join$usedesc %in% c("Apartment, High Rise, Shell","Other residential", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] * 1
 
 current_base_join$units_10[is.na(current_base_join$units_10)] <- 0
 current_base_join$units_10[current_base_join$usedesc_10 == "Duplex"] <- current_base_join$frequency_10[current_base_join$usedesc_10 == "Duplex"] * 2
 current_base_join$units_10[current_base_join$usedesc_10 == "Triplex"] <- current_base_join$frequency_10[current_base_join$usedesc_10 == "Triplex"] * 3
-current_base_join$units_10[!(current_base_join$usedesc_10 %in% c("5", "Apartment, High Rise, Shell", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] <- 1
+current_base_join$units_10[!(current_base_join$usedesc_10 %in% c("5", "Apartment, High Rise, Shell","Other residential", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] <- 1
 current_base_join$units_10[current_base_join$usedesc_10 == ""] <- 0
-current_base_join$units_10[!(current_base_join$usedesc_10 %in% c("Apartment, High Rise, Shell", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] <- current_base_join$frequency_10[!(current_base_join$usedesc_10 %in% c("Apartment, High Rise, Shell", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))]
+current_base_join$units_10[!(current_base_join$usedesc_10 %in% c("Apartment, High Rise, Shell","Other residential", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))] <- current_base_join$frequency_10[!(current_base_join$usedesc_10 %in% c("Apartment, High Rise, Shell","Other residential", "Apartments", "4-6 family", "Mixed Retail w/Residential", "Duplex", "Triplex"))]
 
 # Populate building count fields for current records that were not populated manually in GIS
 current_base_join$buildings[is.na(current_base_join$buildings)] <- 0
@@ -115,7 +115,7 @@ current_base_join$units_10[current_base_join$demolition!=1] <- 0
 current_base_join_final <- current_base_join %>%
   filter(is.na(mobile_home_park)) %>%
   filter(is.na(mobile_home_park_10)) %>%
-  filter(yrbuilt %in% c(2011:2023)) %>%
+  filter(yrbuilt %in% c(2011:2024)) %>%
   rename('juris' = 'jurisdiction')
 
 # Creates a demolitions table that removes the duplication found in the joined current-base table
@@ -246,7 +246,7 @@ tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yr
 
 # Creates final parcel table
 new_unit_parcel_records <- current_base_join_final %>%
-  mutate(project_year = 2024) %>%
+  mutate(project_year = 2025) %>%
   mutate(county = "Snohomish") %>%
   mutate(county_fips = "061") %>%
   mutate(pin=NA) %>%
@@ -265,7 +265,7 @@ new_unit_parcel_records <- current_base_join_final %>%
          y_coord = y)
 
 lost_unit_parcel_records <- demos %>%
-  mutate(project_year = 2024) %>%
+  mutate(project_year = 2025) %>%
   mutate(county = "Snohomish") %>%
   mutate(county_fips = "061") %>%
   mutate(pin=NA) %>%
@@ -290,7 +290,7 @@ snohomish_county_units_long <- total_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2024, 
+  mutate(project_year = 2025, 
          county = "Snohomish") %>% 
   select(project_year, county, year = yrbuilt, structure_type, net_units)
 
@@ -298,7 +298,7 @@ snohomish_juris_units_long <- city_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2024, 
+  mutate(project_year = 2025, 
          county = "Snohomish") %>% 
   select(project_year, county, juris, year = yrbuilt, structure_type, net_units)
 
@@ -306,7 +306,7 @@ snohomish_tract_units_long <- tract_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2024, 
+  mutate(project_year = 2025, 
          county = "Snohomish") %>% 
   select(project_year, county, tract = geoid20, year = yrbuilt, structure_type, net_units)
 
@@ -324,4 +324,4 @@ write_xlsx(x = split(tract_net_summary, tract_net_summary$yrbuilt) %>% map(., ~ 
 
 # save tables to .rda for combining script
 save(snohomish_parcel_tbl, snohomish_county_units_long, snohomish_juris_units_long, snohomish_tract_units_long,
-     file = "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/snohomish_tables.rda")
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2025/elmer/snohomish_tables.rda")
