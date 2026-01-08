@@ -9,14 +9,14 @@ library(rlist)
 #Current Year Processing
 
 # Data directories
-data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2024"
+data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2025"
 current_data_dir <- file.path(data_dir, "extracts/current")
 base_data_dir <- file.path(data_dir, "extracts/base_year_2009")
 inputs_data_dir <- file.path(data_dir, "script_inputs")
-outputs_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2024/script_outputs/"
+outputs_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2025/script_outputs/"
 
 # file names
-id_files <- list(pin_translation = "PIN_Translation_2023_2009.csv",
+id_files <- list(pin_translation = "PIN_Translation_2024_2009.csv",
                  city_tract = "city_tract.csv",
                  full_city_list = "full_city_list.csv",
                  full_tract_list = "full_tract20_list.csv",
@@ -321,9 +321,8 @@ id_dfs[['city_tract']]$juris[id_dfs[['city_tract']]$juris == 'Tacoma'] <- "Feder
 # Adds city/tract fields and filters for relevant years in time series
 base_current_join <- base_current_join %>%
   left_join(id_dfs[['city_tract']],by='pin') %>%
-  filter(yrbuilt %in% c(2010:2023)) %>%
-  mutate(juris = ifelse(is.na(juris),'Z-Missing',juris)) %>%
-  rename("objectid" = "objectid_1")
+  filter(yrbuilt %in% c(2010:2024)) %>%
+  mutate(juris = ifelse(is.na(juris),'Z-Missing',juris))
 
 # If a record does not have a jurisdiction name it show up as 'Z-Missing' in the summary tables and need to be fixed
 base_current_join$districtname <- str_to_title(base_current_join$districtname)
@@ -345,6 +344,10 @@ base_current_join$demolition[base_current_join$pin_2009 == '3388360000'] <- 0
 base_current_join$development[base_current_join$pin_2009 == '3388360000'] <- "new development"
 base_current_join$demolition[base_current_join$pin_2009 == '8663270025'] <- 0
 base_current_join$development[base_current_join$pin_2009 == '8663270025'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '7954000005'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '7954000005'] <- "new development"
+base_current_join$demolition[base_current_join$pin_2009 == '2149800242'] <- 0
+base_current_join$development[base_current_join$pin_2009 == '2149800242'] <- "new development"
 
 # Creates a demolitions table that removes the duplication found in the joined current-base table
 demos <- base_current_join %>%
@@ -485,7 +488,7 @@ tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yr
 
 # Creates final parcel table
 new_unit_parcel_records <- base_current_join %>%
-  mutate(project_year = 2024) %>%
+  mutate(project_year = 2025) %>%
   mutate(county = "King") %>%
   mutate(county_fips = "033") %>%
   select(project_year,
@@ -503,7 +506,7 @@ new_unit_parcel_records <- base_current_join %>%
          y_coord)
 
 lost_unit_parcel_records <- demos %>%
-  mutate(project_year = 2024) %>%
+  mutate(project_year = 2025) %>%
   mutate(county = "King") %>%
   mutate(county_fips = "033") %>%
   select(project_year,
@@ -527,7 +530,7 @@ king_county_units_long <- total_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2024, 
+  mutate(project_year = 2025, 
          county = "King") %>% 
   select(project_year, county, year = yrbuilt, structure_type, net_units)
 
@@ -535,7 +538,7 @@ king_juris_units_long <- city_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2024, 
+  mutate(project_year = 2025, 
          county = "King") %>% 
   select(project_year, county, juris, year = yrbuilt, structure_type, net_units)
 
@@ -543,7 +546,7 @@ king_tract_units_long <- tract_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2024, 
+  mutate(project_year = 2025, 
          county = "King") %>% 
   select(project_year, county, tract = geoid20, year = yrbuilt, structure_type, net_units)
 
@@ -563,5 +566,4 @@ write_xlsx(x = king_parcel_tbl, path = paste0(outputs_data_dir, file_name_parcel
 
 # save tables to .rda for combining script
 save(king_parcel_tbl, king_county_units_long, king_juris_units_long, king_tract_units_long,
-     file = "J:/Projects/Assessor/assessor_permit/data_products/2024/elmer/king_tables.rda")
-
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2025/elmer/king_tables.rda")
