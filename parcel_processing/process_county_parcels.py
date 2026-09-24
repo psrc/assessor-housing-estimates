@@ -2,7 +2,7 @@ import geopandas as gpd
 import yaml
 import os
 
-os.chdir('C:/Users/GGibson/GitHub/PSRC/assessor-housing-estimates/parcel_processing')
+os.chdir('C:/Users/ggibson/GitHub/assessor-housing-estimates/parcel_processing')
 import parcel_utils as pu
 
 config = yaml.safe_load(open('parcel_config.yaml'))
