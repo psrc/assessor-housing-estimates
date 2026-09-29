@@ -9,19 +9,19 @@ library(psrcelmer)
 # Define file paths and other variables -------------------------------------------------------
 
 year_start <- 2010
-year_end <- 2024
-proj_year <- 2025
+year_end <- 2025
+proj_year <- 2026
 
 # source data file paths
 current_file_path <- str_glue("J:/Projects/Assessor/assessor_permit/kitsap/data/{proj_year}/extracts/")
-current_file_name <- "KITSAP_COUNTY_PARCELS_09302025.shp"
+current_file_name <- "KITSAP_COUNTY_PARCELS_09162026.shp"
 
 base_file_path <- "J:/Projects/Assessor/assessor_permit/kitsap/data/base_year/extracts/"
 base_file_name <- "Kitsap_Housing_2011.xlsx"
 base_improvements_name <- "improvements.csv"
 
 current_base_shapefile_path <- str_glue("J:/Projects/Assessor/assessor_permit/kitsap/data/{proj_year}/GIS/")
-current_base_shapefile_name <- "parcels_2025_2010_region24_tract20.shp"
+current_base_shapefile_name <- "parcels_2026_2010_region25_tract20.shp"
 
 juris_query <- "SELECT juris, feat_type FROM dbo.PSRC_REGION WHERE cnty_name = 'Kitsap' AND feat_type <> 'water'"
 
@@ -33,7 +33,9 @@ output_file_path <- str_glue("J:/Projects/Assessor/assessor_permit/kitsap/data/{
 # Load data from source -----------------------------------------------------------------------
 
 juris <- get_query(sql = juris_query, db_name = "ElmerGeo") %>% 
-  mutate(juris = ifelse(feat_type %in% c("uninc", "rural"), "Unincorporated Kitsap", juris)) %>% 
+  mutate(juris = case_when(feat_type == "uninc" ~ "Urban Unincorporated Kitsap",
+                           feat_type == "rural" ~ "Rural Kitsap",
+                           TRUE ~ juris)) %>% 
   select(-feat_type) %>% 
   distinct() %>% 
   arrange(juris)
@@ -71,8 +73,8 @@ parcels_current_base <- st_read(paste0(current_base_shapefile_path, current_base
   rename(current_rid = RP_ACCT_ID) %>% 
   distinct()
 
-# Read in dwellings table from July 2025 extract and filter for townhouse designation
-townhouses <- read_delim("J:/Projects/Assessor/extracts/2025/July_25/Kitsap/Dwellings.txt",
+# Read in dwellings table from extracts and filter for townhouse designation
+townhouses <- read_delim("J:/Projects/Assessor/extracts/2026/July_26/Kitsap/Dwellings.txt",
                          delim = "\t",
                          col_types = cols(
                            rp_acct_id = col_character()
@@ -91,6 +93,9 @@ current_year_condos <- filter(current_year, PROP_CLASS == "141")
 # n_distinct(current_year_condos$RP_ACCT_ID)  # 24
 # all SF; incorporate into summary table
 
+# remove extraneous duplicate record
+# current_year <- current_year[!(current_year$RP_ACCT_ID == "1490747" & current_year$TOTAL_UNIT == 0), ]
+
 # summarize current year table by RP_ACCT_ID
 current_year_sum <- current_year %>% 
   filter(PROP_CLASS %in% c("111", "118", "119", "121", "122", "123",
@@ -100,7 +105,7 @@ current_year_sum <- current_year %>%
   group_by(RP_ACCT_ID) %>% 
   summarize(ACCT_NO = first(ACCT_NO),
             units = sum(TOTAL_UNIT),
-            buildings = ifelse(NUM_COMM > 0 & PROP_CLASS != "111", sum(NUM_COMM), sum(NUM_DWELL)),
+            buildings = sum(ifelse(NUM_COMM > 0 & PROP_CLASS != "111", NUM_COMM, NUM_DWELL)),
             years = list(sort(unique(YEAR_BUILT))),
             year_count = n_distinct(YEAR_BUILT),
             year_built = min(YEAR_BUILT),
@@ -130,10 +135,7 @@ current_year_sum$house_type[current_year_sum$RP_ACCT_ID == "2414415"] <- NA
 
 # delete records with 0 units (unfinished construction)
 # View(filter(current_year_sum, units == 0))
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "1490747"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "1508183"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2687838"), ]
-current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2694859"), ]
+current_year_sum <- current_year_sum[!(current_year_sum$RP_ACCT_ID == "2072841"), ]
 ####
 
 current_year_sum$units_per_bldg <- round(current_year_sum$units / current_year_sum$buildings, 0)
@@ -164,19 +166,26 @@ current_year_sum$str_type <- ordered(current_year_sum$str_type,
 current_year_sum <- left_join(current_year_sum, parcels_current_base, by = c("RP_ACCT_ID" = "current_rid"))
 
 #### UNIQUE TO THIS DATA - CHECK EVERY YEAR!
-# parcel centroids didn't match to other polygons in ArcMap processing
+# parcel centroids didn't match to other polygons in pre-processing
 # View(filter(current_year_sum, is.na(juris)))
-current_year_sum$juris[current_year_sum$RP_ACCT_ID == "2717072"] <- "Unincorporated Kitsap"
+current_year_sum$juris[current_year_sum$RP_ACCT_ID == "2726131"] <- "Rural Kitsap"
+current_year_sum$juris[current_year_sum$RP_ACCT_ID == "2726149"] <- "Rural Kitsap"
 
 # View(filter(current_year_sum, is.na(tractid)))
 # View(filter(current_year_sum, is.na(tract20)))
-current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2717072"] <- "53035090102"
-current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2717072"] <- "901.02"
+current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2726131"] <- "53035090202"
+current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2726131"] <- "902.02"
+
+current_year_sum$tractid[current_year_sum$RP_ACCT_ID == "2726149"] <- "53035090101"
+current_year_sum$tract20[current_year_sum$RP_ACCT_ID == "2726149"] <- "901.01"
 
 # View(filter(current_year_sum, is.na(x_coord)))
 # View(filter(current_year_sum, is.na(y_coord)))
-current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2717072"] <- 1226133
-current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2717072"] <- 304118
+current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2726131"] <- 1203857
+current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2726131"] <- 286899
+
+current_year_sum$x_coord[current_year_sum$RP_ACCT_ID == "2726149"] <- 1211963
+current_year_sum$y_coord[current_year_sum$RP_ACCT_ID == "2726149"] <- 333963
 ####
 
 rm(current_year, parcels_current_base)
@@ -299,7 +308,8 @@ current_base_join$juris <- ordered(current_base_join$juris,
                                               "Bremerton",
                                               "Port Orchard",
                                               "Poulsbo",
-                                              "Unincorporated Kitsap"))
+                                              "Urban Unincorporated Kitsap",
+                                              "Rural Kitsap"))
 
 rm(base_pins)
 
