@@ -9,8 +9,8 @@ library(psrcelmer)
 # Define file paths and other variables -------------------------------------------------------
 
 year_start <- 2012
-year_end <- 2024
-proj_year <- 2025
+year_end <- 2025
+proj_year <- 2026
 
 # source data file paths
 current_file_path <- str_glue("J:/Projects/Assessor/assessor_permit/pierce/data/{proj_year}/extracts/")
@@ -24,7 +24,7 @@ base_improvement_file_name <- "improvement_2012.csv"
 base_builtas_file_name <- "improvement_builtas_2012.csv"
 
 current_shapefile_path <- str_glue("J:/Projects/Assessor/assessor_permit/pierce/data/{proj_year}/GIS/")
-current_base_shapefile_name <- "parcels_2025_2012_region24_tract20.shp"
+current_base_shapefile_name <- "parcels_2026_2012_region25_tract20.shp"
 
 base_shapefile_path <- "J:/Projects/Assessor/assessor_permit/pierce/data/base_year/GIS/"
 condo_base_shapefile_name <- "pierce_condos_2012.shp"
@@ -39,7 +39,9 @@ output_file_path <- str_glue("J:/Projects/Assessor/assessor_permit/pierce/data/{
 # Load data from source -----------------------------------------------------------------------
 
 juris <- get_query(sql = juris_query, db_name = "ElmerGeo") %>% 
-  mutate(juris = ifelse(feat_type %in% c("uninc", "rural"), "Unincorporated Pierce", juris)) %>% 
+  mutate(juris = case_when(feat_type == "uninc" ~ "Urban Unincorporated Pierce",
+                           feat_type == "rural" ~ "Rural Pierce",
+                           TRUE ~ juris)) %>% 
   select(-feat_type) %>% 
   distinct() %>% 
   arrange(juris)
@@ -145,24 +147,20 @@ current_year <- current_year[!(current_year$parcel_number == "5270001611" & curr
 current_year$buildings[current_year$parcel_number == "5270001611"] <- 19
 
 current_year <- current_year[!(current_year$parcel_number == "220142041" & current_year$units == 0), ]
-# current_year <- current_year[!(current_year$parcel_number == "8950003316" & current_year$units == 0), ]
 current_year <- current_year[!(current_year$parcel_number == "9010740030" & current_year$units == 0), ]
 
 # Non-residential structure
-current_year <- current_year[!(current_year$parcel_number == "2078140051"), ]
 current_year <- current_year[!(current_year$parcel_number == "6565000030" & current_year$building_id == 2), ]
 current_year <- current_year[!(current_year$parcel_number == "419157060"), ]
 current_year <- current_year[!(current_year$parcel_number == "2011230010" & current_year$built_as_number == 3), ]
+current_year <- current_year[!(current_year$parcel_number == "416194008"), ]
+current_year <- current_year[!(current_year$parcel_number == "420202101"), ]
+current_year <- current_year[!(current_year$parcel_number == "2078140051"), ]
 
 # Delete rows from current table with 0 units (oddball) or structure is incomplete
-# current_year <- current_year[!(current_year$parcel_number == "420346013"), ]
-# current_year <- current_year[!(current_year$parcel_number == "420346014"), ]
-# current_year <- current_year[!(current_year$parcel_number == "2011230010"), ]
-current_year <- current_year[!(current_year$parcel_number == "9010990010"), ]
-current_year <- current_year[!(current_year$parcel_number == "9010990020"), ]
-current_year <- current_year[!(current_year$parcel_number == "9010990030"), ]
-current_year <- current_year[!(current_year$parcel_number == "9010990040"), ]
-current_year <- current_year[!(current_year$parcel_number == "9010990050"), ]
+current_year <- current_year[!(current_year$parcel_number == "20026004"), ]
+current_year <- current_year[!(current_year$parcel_number == "2240003473"), ]
+current_year <- current_year[!(current_year$parcel_number == "2240003474"), ]
 
 # Fix null unit counts
 current_year$units[is.na(current_year$units)] <- 1
@@ -211,7 +209,7 @@ current_year_sum <- current_prcl_join %>%
             adjusted_year_built = max(adjusted_year_built),
             built_as_ids = list(sort(unique(built_as_id))),
             built_as_descriptions = list(sort(unique(built_as_description))),
-            str_type = case_when(!is.na(str_type) ~ list(sort(unique(str_type)))),
+            str_type = paste0(sort(unique(str_type)), collapse = ", "),
             group_acct_number = first(group_acct_number),
             appraisal_account_type = first(appraisal_account_type),
             base_prcl = first(base_prcl),
@@ -221,6 +219,7 @@ current_year_sum <- current_prcl_join %>%
             x_coord = first(x_coord),
             y_coord = first(y_coord)
   ) %>% 
+  mutate(str_type = replace_values(str_type, "" ~ NA)) %>% 
   distinct(current_prcl, .keep_all = TRUE)
 
 # Summarize current condos table by current base PIN
@@ -249,25 +248,25 @@ current_year_condos_sum <- current_condos_prcl_join %>%
   )
 
 # Combine summarized tables
-current_year_join <- rbind(current_year_sum, current_year_condos_sum)
+current_year_join <- bind_rows(current_year_sum, current_year_condos_sum)
 
 # Add units per building column
 current_year_join$units_per_bldg <- round(current_year_join$units / current_year_join$buildings, digits = 0)
 
 # Determine current year str_type by units_per_bldg
-current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
+current_year_join$str_type <- ifelse(is.na(current_year_join$str_type)
                                      & current_year_join$units_per_bldg >= 2 & current_year_join$units_per_bldg <= 4,
                                      "multifamily 2-4 units", current_year_join$str_type)
-current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
+current_year_join$str_type <- ifelse(is.na(current_year_join$str_type)
                                      & current_year_join$units_per_bldg >= 5 & current_year_join$units_per_bldg <= 9,
                                      "multifamily 5-9 units", current_year_join$str_type)
-current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
+current_year_join$str_type <- ifelse(is.na(current_year_join$str_type)
                                      & current_year_join$units_per_bldg >= 10 & current_year_join$units_per_bldg <= 19,
                                      "multifamily 10-19 units", current_year_join$str_type)
-current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
+current_year_join$str_type <- ifelse(is.na(current_year_join$str_type)
                                      & current_year_join$units_per_bldg >= 20 & current_year_join$units_per_bldg <= 49,
                                      "multifamily 20-49 units", current_year_join$str_type)
-current_year_join$str_type <- ifelse(current_year_join$str_type == "NULL"
+current_year_join$str_type <- ifelse(is.na(current_year_join$str_type)
                                      & current_year_join$units_per_bldg >= 50,
                                      "multifamily 50+ units", current_year_join$str_type)
 
@@ -346,8 +345,9 @@ base_year_sum <- base_year %>%
             base_adjusted_year_built = max(adjusted_year_built),
             base_built_as_ids = list(sort(unique(built_as_id))),
             base_built_as_descriptions = list(sort(unique(built_as_description))),
-            base_str_type = case_when(!is.na(base_str_type) ~ list(sort(unique(base_str_type))))
+            base_str_type = paste0(sort(unique(base_str_type)), collapse = ", ")
   ) %>% 
+  mutate(base_str_type = replace_values(base_str_type, "" ~ NA)) %>% 
   distinct(parcel_number, .keep_all = TRUE)
 
 # Join base condo records to base condo parcels on condo PIN
@@ -371,26 +371,26 @@ base_year_condos_sum <- base_condos_join %>%
   rename(parcel_number = base_prcl)
 
 # Combine summarized tables
-base_year_join <- rbind(base_year_sum, base_year_condos_sum)
+base_year_join <- bind_rows(base_year_sum, base_year_condos_sum)
 base_year_join <- base_year_join[!is.na(base_year_join$parcel_number), ]
 
 # Add units per building column
 base_year_join$base_units_per_bldg <- round(base_year_join$base_units / base_year_join$base_buildings, digits = 0)
 
 # Determine base year str_type by units_per_bldg
-base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
+base_year_join$base_str_type <- ifelse(is.na(base_year_join$base_str_type)
                                        & base_year_join$base_units_per_bldg >= 2 & base_year_join$base_units_per_bldg <= 4,
                                        "multifamily 2-4 units", base_year_join$base_str_type)
-base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
+base_year_join$base_str_type <- ifelse(is.na(base_year_join$base_str_type)
                                        & base_year_join$base_units_per_bldg >= 5 & base_year_join$base_units_per_bldg <= 9,
                                        "multifamily 5-9 units", base_year_join$base_str_type)
-base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
+base_year_join$base_str_type <- ifelse(is.na(base_year_join$base_str_type)
                                        & base_year_join$base_units_per_bldg >= 10 & base_year_join$base_units_per_bldg <= 19,
                                        "multifamily 10-19 units", base_year_join$base_str_type)
-base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
+base_year_join$base_str_type <- ifelse(is.na(base_year_join$base_str_type)
                                        & base_year_join$base_units_per_bldg >= 20 & base_year_join$base_units_per_bldg <= 49,
                                        "multifamily 20-49 units", base_year_join$base_str_type)
-base_year_join$base_str_type <- ifelse(base_year_join$base_str_type == "NULL"
+base_year_join$base_str_type <- ifelse(is.na(base_year_join$base_str_type)
                                        & base_year_join$base_units_per_bldg >= 50,
                                        "multifamily 50+ units", base_year_join$base_str_type)
 
@@ -424,12 +424,12 @@ current_base_join <- current_base_join[!is.na(current_base_join$current_prcl), ]
 current_base_join$str_type[current_base_join$current_prcl %in% c("0022272011", "0416104046", "0417084029",
                                                                  "0417173702", "0022251008", "5017101160",
                                                                  "0316062043", "0317221017", "0417287026",
-                                                                 "0420262029")] <- "single family detached"
+                                                                 "0420262029", "0021132005", "0417342027")] <- "single family detached"
 
 current_base_join$str_type[current_base_join$current_prcl %in% c("4002890023", "4002890026", "0220113034",
                                                                  "0221068038", "2019220081", "2019220082",
                                                                  "2019220083", "2019220086", "2019220087",
-                                                                 "2019220088", "2260000421")] <- "single family attached"
+                                                                 "2019220088", "2260000421", "5455000491")] <- "single family attached"
 
 current_base_join$str_type[current_base_join$current_prcl == "7108000290"] <- "mobile homes"
 

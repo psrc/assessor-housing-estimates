@@ -17,7 +17,7 @@ def get_juris(config):
 
 def get_tracts(config):
     """Connect to ElmerGeo and read in 2020 tract layer."""
-    eg_conn = "DRIVER={ODBC Driver 17 for SQL Server}; SERVER=SQLserver; DATABASE=Elmer; trusted_connection=yes"
+    eg_conn = "DRIVER={ODBC Driver 18 for SQL Server}; SERVER=SQLserver; DATABASE=Elmer; trusted_connection=yes; TrustServerCertificate=yes"
     tract_query = """SELECT geoid20 AS tractid, name20 AS tract20, Shape.STAsText() AS [geometry]
                      FROM ElmerGeo.dbo.tract2020_evw;
                   """
@@ -42,7 +42,7 @@ def process_kitsap_parcels(config, juris, tracts):
     base_gdf = base_gdf[['base_rid', 'geometry']]
     
     # read in current parcel layer
-    current_gdf = gpd.read_file(current_path, layer='Tax_Parcel_lot_polygons')
+    current_gdf = gpd.read_file(current_path)
     current_gdf = current_gdf.to_crs(config['crs'])
     
     # create points from polygons
