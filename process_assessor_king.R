@@ -9,14 +9,14 @@ library(rlist)
 #Current Year Processing
 
 # Data directories
-data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2025"
+data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2026"
 current_data_dir <- file.path(data_dir, "extracts/current")
 base_data_dir <- file.path(data_dir, "extracts/base_year_2009")
 inputs_data_dir <- file.path(data_dir, "script_inputs")
-outputs_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2025/script_outputs/"
+outputs_data_dir <- "J:/Projects/Assessor/assessor_permit/king/data/2026/script_outputs/"
 
 # file names
-id_files <- list(pin_translation = "PIN_Translation_2024_2009.csv",
+id_files <- list(pin_translation = "PIN_Translation_2025_2009.csv",
                  city_tract = "city_tract.csv",
                  full_city_list = "full_city_list.csv",
                  full_tract_list = "full_tract20_list.csv",
@@ -217,7 +217,7 @@ bldg_dfs[['apts_09']] <- bldg_dfs[['apts_09']] %>%
 
 # Filter out un-needed columns from apt complex table and change names to be consistent with other tables
 bldg_dfs[['apts_09']] <- bldg_dfs[['apts_09']] %>%
-  summarise(pin=pin,nbrbldgs=numbldgs,yrbuilt=yrbuilt,nbrunits=numunits,address=situsaddress,table=table,complex_category=complex_category)
+  select(pin=pin,nbrbldgs=numbldgs,yrbuilt=yrbuilt,nbrunits=numunits,address=situsaddress,table=table,complex_category=complex_category)
 
 # Present Use codes found in look up table
 present_use_09 <- filter(bldg_dfs[['look_up_09']],lutype==102)
@@ -321,7 +321,7 @@ id_dfs[['city_tract']]$juris[id_dfs[['city_tract']]$juris == 'Tacoma'] <- "Feder
 # Adds city/tract fields and filters for relevant years in time series
 base_current_join <- base_current_join %>%
   left_join(id_dfs[['city_tract']],by='pin') %>%
-  filter(yrbuilt %in% c(2010:2024)) %>%
+  filter(yrbuilt %in% c(2010:2025)) %>%
   mutate(juris = ifelse(is.na(juris),'Z-Missing',juris))
 
 # If a record does not have a jurisdiction name it show up as 'Z-Missing' in the summary tables and need to be fixed
@@ -366,6 +366,20 @@ demos$structure_type_09[demos$pin == '9516100010'] <- 'mobile homes'
 demos <- rbind(demos,id_dfs[["mobile_home_park_closures"]])
 base_current_join <- rbind(base_current_join,id_dfs[["mobile_home_park_openings"]])
 
+#Removes records with no tract ID (these are records that are not found in the parcel GIS layer)
+base_current_join <- drop_na(base_current_join, geoid20)
+demos <- drop_na(demos, geoid20)
+
+# Creates a table that is used as a development capacity indicator
+development_capacity_indicator <- base_current_join %>%
+  select('id'='pin', 
+         'yrbuilt_base'='yrbuilt_09',
+         'structure_type_base'='structure_type_09',
+         'units_base'='nbrunits_09',
+         'yrbuilt_current'='yrbuilt',
+         'structure_type_current'='structure_type',
+         'units_current'='nbrunits',
+         'developement_type'='development')
 
 ## Creates functions to summarize the net change estimates by county total, jurisdiction, and census tract
 
@@ -488,7 +502,7 @@ tract_net_summary <- full_join(new_tract, lost_tract, by = join_by("geoid20","yr
 
 # Creates final parcel table
 new_unit_parcel_records <- base_current_join %>%
-  mutate(project_year = 2025) %>%
+  mutate(project_year = 2026) %>%
   mutate(county = "King") %>%
   mutate(county_fips = "033") %>%
   select(project_year,
@@ -506,7 +520,7 @@ new_unit_parcel_records <- base_current_join %>%
          y_coord)
 
 lost_unit_parcel_records <- demos %>%
-  mutate(project_year = 2025) %>%
+  mutate(project_year = 2026) %>%
   mutate(county = "King") %>%
   mutate(county_fips = "033") %>%
   select(project_year,
@@ -530,7 +544,7 @@ king_county_units_long <- total_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2025, 
+  mutate(project_year = 2026, 
          county = "King") %>% 
   select(project_year, county, year = yrbuilt, structure_type, net_units)
 
@@ -538,7 +552,7 @@ king_juris_units_long <- city_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2025, 
+  mutate(project_year = 2026, 
          county = "King") %>% 
   select(project_year, county, juris, year = yrbuilt, structure_type, net_units)
 
@@ -546,7 +560,7 @@ king_tract_units_long <- tract_net_summary %>%
   pivot_longer(cols = 'net_total':'mobile homes',
                names_to = "structure_type",
                values_to = "net_units") %>% 
-  mutate(project_year = 2025, 
+  mutate(project_year = 2026, 
          county = "King") %>% 
   select(project_year, county, tract = geoid20, year = yrbuilt, structure_type, net_units)
 
@@ -556,6 +570,7 @@ file_name_county <- paste0("king_unit_estimates_county_", format(Sys.Date(), "%Y
 file_name_juris <- paste0("king_unit_estimates_juris_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 file_name_tract <- paste0("king_unit_estimates_tract20_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 file_name_parcel <- paste0("king_unit_estimates_parcel_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+file_name_indicator <- paste0("king_development_capacity_indicator_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
 
 write_xlsx(x = total_net_summary, path = paste0(outputs_data_dir, file_name_county))
 write_xlsx(x = split(city_net_summary, city_net_summary$yrbuilt) %>% map(., ~ (.x %>% select(-yrbuilt))),
@@ -563,7 +578,8 @@ write_xlsx(x = split(city_net_summary, city_net_summary$yrbuilt) %>% map(., ~ (.
 write_xlsx(x = split(tract_net_summary, tract_net_summary$yrbuilt) %>% map(., ~ (.x %>% select(-yrbuilt))),
            path = paste0(outputs_data_dir, file_name_tract))
 write_xlsx(x = king_parcel_tbl, path = paste0(outputs_data_dir, file_name_parcel))
+write_xlsx(x = development_capacity_indicator, path = paste0(outputs_data_dir, file_name_indicator))
 
 # save tables to .rda for combining script
 save(king_parcel_tbl, king_county_units_long, king_juris_units_long, king_tract_units_long,
-     file = "J:/Projects/Assessor/assessor_permit/data_products/2025/elmer/king_tables.rda")
+     file = "J:/Projects/Assessor/assessor_permit/data_products/2026/elmer/king_tables.rda")
