@@ -627,7 +627,7 @@ write_xlsx(x = split(tract_units, tract_units$year_built) %>% map(., ~ (.x %>% s
            path = paste0(output_file_path, file_name_tract))
 
 
-# Create output for combined region processing - AFTER REVIEW ---------------------------------
+# Create output for combined region processing ------------------------------------------------
 # parcel table for shapefile
 parcel_new <- current_base_join %>% 
   mutate(project_year = proj_year,
@@ -697,3 +697,18 @@ pierce_tract_units_long <- tract_units %>%
 # save tables to .rda for combining script
 save(pierce_parcel_tbl, pierce_county_units_long, pierce_juris_units_long, pierce_tract_units_long,
      file = str_glue("J:/Projects/Assessor/assessor_permit/data_products/{proj_year}/elmer/pierce_tables.rda"))
+
+# Output parcel table for Brian/Mary - development capacity -----------------------------------
+
+dev_capacity_tbl <- current_base_join |> 
+  select(id = current_prcl,
+         yr_built_base = base_year_built,
+         structure_type_base = base_str_type,
+         units_base = base_units,
+         yrbuilt_current = year_built,
+         structure_type_current = str_type,
+         units_current = units,
+         development_type = development
+  )
+
+write_xlsx(dev_capacity_tbl, paste0("J:/Projects/Assessor/assessor_permit/data_requests/development_capacity_indicator/", "pierce_development_capacity_indicator_", format(Sys.Date(), "%Y%m%d"), ".xlsx"))
