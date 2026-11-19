@@ -130,7 +130,8 @@ current_base_join_final <- current_base_join_final %>%
 
 # Creates a table that is used as a development capacity indicator
 development_capacity_indicator <- current_base_join_final %>%
-  select('id'='group_id', 
+  select('id'='group_id',
+         'id_base' = 'group_id_10',
          'yrbuilt_base'='yrbuilt_10',
          'structure_type_base'='structure_type_10',
          'units_base'='units_10',

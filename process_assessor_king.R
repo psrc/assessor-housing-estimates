@@ -372,7 +372,8 @@ demos <- drop_na(demos, geoid20)
 
 # Creates a table that is used as a development capacity indicator
 development_capacity_indicator <- base_current_join %>%
-  select('id'='pin', 
+  select('id'='pin',
+         'base_id' = 'pin_2009',
          'yrbuilt_base'='yrbuilt_09',
          'structure_type_base'='structure_type_09',
          'units_base'='nbrunits_09',
